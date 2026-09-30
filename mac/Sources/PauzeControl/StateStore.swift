@@ -38,6 +38,7 @@ final class StateStore {
 
             return value["restricted"] as? Bool ?? false
         }
+
         set {
             guard let data = try? JSONSerialization.data(
                 withJSONObject: ["restricted": newValue],
@@ -47,7 +48,10 @@ final class StateStore {
             }
 
             try? data.write(to: fileURL, options: [.atomic])
-            _ = chmod(fileURL.path, 0o600)
+
+            fileURL.path.withCString { pointer in
+                _ = chmod(pointer, 0o600)
+            }
         }
     }
 }
