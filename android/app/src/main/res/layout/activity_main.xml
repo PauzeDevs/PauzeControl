@@ -13,16 +13,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="22dp"
-        android:paddingTop="28dp"
-        android:paddingEnd="22dp"
-        android:paddingBottom="40dp">
+        android:paddingStart="20dp"
+        android:paddingTop="22dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="36dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:gravity="center_vertical">
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -33,176 +32,86 @@
                     android:layout_height="wrap_content"
                     android:text="PAUZE"
                     android:textColor="#FFFFFF"
-                    android:textSize="30sp"
+                    android:textSize="31sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.08" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="CONTROL"
-                    android:textColor="#707887"
-                    android:textSize="11sp"
+                    android:text="CONTROL CENTER"
+                    android:textColor="#727989"
+                    android:textSize="10sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.28" />
+                    android:letterSpacing="0.24" />
             </LinearLayout>
             <TextView
                 android:id="@+id/connectionPill"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/card_status"
-                android:paddingStart="12dp"
-                android:paddingTop="7dp"
-                android:paddingEnd="12dp"
-                android:paddingBottom="7dp"
+                android:paddingStart="13dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="13dp"
+                android:paddingBottom="8dp"
                 android:text="● OFFLINE"
                 android:textColor="#9AA0AD"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="34dp"
-            android:text="YOUR MAC"
-            android:textColor="#707887"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.18" />
-
         <LinearLayout
-            android:id="@+id/statusCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/macNameText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="MacBook Air"
-                android:textColor="#FFFFFF"
-                android:textSize="25sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/macStateText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Not connected"
-                android:textColor="#9AA0AD"
-                android:textSize="15sp" />
-            <TextView
-                android:id="@+id/statusText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
-                android:text="Waiting for connection…"
-                android:textColor="#C7CBD4"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
-            android:text="CONTROL"
-            android:textColor="#707887"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.18" />
-
-        <Button
-            android:id="@+id/restrictButton"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/button_primary"
-            android:text="🔒  RESTRICT MAC"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/allowButton"
-            android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:text="🔓  ALLOW MAC"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="34dp"
-            android:text="CONNECTION"
-            android:textColor="#707887"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.18" />
-
-        <EditText
-            android:id="@+id/hostInput"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:hint="Mac Tailscale address"
-            android:inputType="textUri"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#626875" />
-
-        <EditText
-            android:id="@+id/tokenInput"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:hint="Pairing secret"
-            android:inputType="textPassword"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#626875" />
-
-        <Button
-            android:id="@+id/saveButton"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:text="SAVE CONNECTION"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/statusButton"
+            android:id="@+id/navBar"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="22dp"
             android:background="@drawable/card_status"
-            android:text="CHECK STATUS"
-            android:textColor="#9AA0AD"
-            android:textSize="13sp" />
+            android:gravity="center_vertical"
+            android:padding="5dp">
+            <TextView android:id="@+id/navDashboard" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="HOME" android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" />
+            <TextView android:id="@+id/navActivity" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="ACTIVITY" android:textColor="#737988" android:textSize="11sp" android:textStyle="bold" />
+            <TextView android:id="@+id/navSettings" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="SETTINGS" android:textColor="#737988" android:textSize="11sp" android:textStyle="bold" />
+        </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
-            android:text="SECURE REMOTE CONTROL  •  TAILSCALE"
-            android:textAlignment="center"
-            android:textColor="#4F5562"
-            android:textSize="10sp"
-            android:letterSpacing="0.12" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:text="YOUR MAC" android:textColor="#707887" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.18" />
 
+        <LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:orientation="vertical" android:padding="20dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:id="@+id/macNameText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="MacBook Air" android:textColor="#FFFFFF" android:textSize="24sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/macStateText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Not connected" android:textColor="#9AA0AD" android:textSize="14sp" />
+                </LinearLayout>
+                <TextView android:layout_width="42dp" android:layout_height="42dp" android:background="@drawable/button_primary" android:gravity="center" android:text="⌁" android:textColor="#FFFFFF" android:textSize="21sp" />
+            </LinearLayout>
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="18dp" android:background="#292C35" />
+            <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="Waiting for connection…" android:textColor="#C7CBD4" android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:text="QUICK CONTROL" android:textColor="#707887" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.18" />
+
+        <Button android:id="@+id/restrictButton" android:layout_width="match_parent" android:layout_height="62dp" android:layout_marginTop="10dp" android:background="@drawable/button_primary" android:text="🔒  RESTRICT MAC" android:textAllCaps="false" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+            <Button android:id="@+id/allowButton" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:background="@drawable/card_status" android:text="🔓  ALLOW" android:textAllCaps="false" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" />
+            <Button android:id="@+id/statusButton" android:layout_width="0dp" android:layout_height="56dp" android:layout_marginStart="10dp" android:layout_weight="1" android:background="@drawable/card_status" android:text="↻  REFRESH" android:textAllCaps="false" android:textColor="#C7CBD4" android:textSize="14sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="30dp" android:text="SECURITY" android:textColor="#707887" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.18" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:orientation="vertical" android:padding="18dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Remote control protected" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Pairing secret is stored locally. Commands are sent only to your configured Mac." android:textColor="#858B99" android:textSize="12sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="●  PRIVATE CONNECTION" android:textColor="#69F0AE" android:textSize="10sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="30dp" android:text="RECENT ACTIVITY" android:textColor="#707887" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.18" />
+        <LinearLayout android:id="@+id/activityCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:orientation="vertical" android:padding="18dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No activity yet" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Connect your Mac to start recording remote-control events." android:textColor="#858B99" android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="30dp" android:text="CONNECTION" android:textColor="#707887" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.18" />
+        <EditText android:id="@+id/hostInput" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:hint="Mac Tailscale address" android:inputType="textUri" android:paddingStart="18dp" android:paddingEnd="18dp" android:textColor="#FFFFFF" android:textColorHint="#626875" />
+        <EditText android:id="@+id/tokenInput" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:hint="Pairing secret" android:inputType="textPassword" android:paddingStart="18dp" android:paddingEnd="18dp" android:textColor="#FFFFFF" android:textColorHint="#626875" />
+        <Button android:id="@+id/saveButton" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="10dp" android:background="@drawable/card_status" android:text="SAVE CONNECTION" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="30dp" android:text="PAUZE CONTROL  •  PRIVATE REMOTE ACCESS" android:textAlignment="center" android:textColor="#4F5562" android:textSize="10sp" android:letterSpacing="0.12" />
     </LinearLayout>
 </ScrollView>
