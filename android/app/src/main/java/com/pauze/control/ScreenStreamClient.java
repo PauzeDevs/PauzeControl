@@ -150,9 +150,9 @@ public final class ScreenStreamClient {
             }
 
             if (width <= 0 ||
-                    width > 1280 ||
+                    width > 1920 ||
                     height <= 0 ||
-                    height > 720) {
+                    height > 1080) {
                 throw new IllegalStateException(
                         "Invalid screen dimensions."
                 );
