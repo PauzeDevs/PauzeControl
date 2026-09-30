@@ -3,7 +3,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050609">
+    android:background="#050609"
+    android:keepScreenOn="true">
 
     <SurfaceView
         android:id="@+id/screenSurface"
@@ -12,61 +13,153 @@
         android:contentDescription="Live Mac screen"
         android:keepScreenOn="true" />
 
+    <!-- YouTube-style top chrome. It is intentionally translucent so the Mac
+         screen remains the focus instead of being covered by a card. -->
     <LinearLayout
+        android:id="@+id/topControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#CC07080B"
+        android:background="#B807080B"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="18dp"
-        android:paddingTop="16dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="16dp">
+        android:paddingTop="14dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="14dp">
 
-        <LinearLayout
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PAUZE"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:id="@+id/liveStatus"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="PAUZE"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08" />
-
-            <TextView
-                android:id="@+id/liveStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="CONNECTING • H.264"
-                android:textColor="#69F0AE"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:layout_marginStart="14dp"
+            android:text="CONNECTING • H.264"
+            android:textColor="#69F0AE"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/resolutionText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
             android:text="VIEW ONLY • H.264"
-            android:textColor="#A1A6B2"
+            android:textColor="#E0E3EA"
             android:textSize="10sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/closeButton"
-            android:layout_width="52dp"
-            android:layout_height="46dp"
-            android:layout_marginStart="10dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="×"
+            android:textColor="#FFFFFF"
+            android:textSize="27sp" />
+    </LinearLayout>
+
+    <!-- Center action appears only when the stream needs attention. -->
+    <LinearLayout
+        android:id="@+id/centerControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/reconnectButton"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:background="@drawable/card_status"
             android:minHeight="0dp"
-            android:text="×"
+            android:minWidth="0dp"
+            android:text="↻"
+            android:textColor="#FFFFFF"
+            android:textSize="30sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="RECONNECT"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Bottom player controls: no fake seek bar because this is a live stream. -->
+    <LinearLayout
+        android:id="@+id/bottomControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#CC07080B"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/liveBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#E60000"
+            android:paddingStart="9dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="5dp"
+            android:text="LIVE"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/streamInfo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:text="MacBook Air  •  View only"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/reconnectBottomButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="↻"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp" />
+
+        <Button
+            android:id="@+id/fullscreenButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="⛶"
             android:textColor="#FFFFFF"
             android:textSize="22sp" />
     </LinearLayout>
