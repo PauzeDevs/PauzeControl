@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#090A0D">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PAUZE CONTROL"
+            android:textColor="#FFFFFF"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Mac: not connected"
+            android:textColor="#A9ACB6"
+            android:textSize="15sp" />
+
+        <EditText
+            android:id="@+id/hostInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:hint="Mac Tailscale address"
+            android:inputType="textUri"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#70737D" />
+
+        <EditText
+            android:id="@+id/tokenInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="Pairing secret"
+            android:inputType="textPassword"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#70737D" />
+
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="SAVE CONNECTION" />
+
+        <Button
+            android:id="@+id/restrictButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="🔒  RESTRICT MAC"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/allowButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="🔓  ALLOW MAC"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/statusButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="CHECK STATUS" />
+
+    </LinearLayout>
+</ScrollView>
