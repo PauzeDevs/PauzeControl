@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="#3F5FBD" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="#5E8CFF" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+</selector>
