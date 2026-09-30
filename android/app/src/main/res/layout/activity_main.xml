@@ -163,7 +163,7 @@
                     android:layout_height="46dp"
                     android:background="@drawable/button_primary"
                     android:gravity="center"
-                    android:text="↯"
+                    android:text="✦"
                     android:textColor="#FFFFFF"
                     android:textSize="22sp"
                     android:textStyle="bold" />
@@ -398,68 +398,73 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="30dp"
             android:text="QUICK CONTROL"
-            android:textColor="#707887"
+            android:textColor="#8D82FF"
             android:textSize="11sp"
             android:textStyle="bold"
             android:letterSpacing="0.20" />
 
-        <Button
-            android:id="@+id/restrictButton"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/button_primary"
-            android:gravity="center"
-            android:minHeight="0dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:text="🔒  RESTRICT MAC"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
         <LinearLayout
+            android:id="@+id/restrictionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:background="@drawable/card_status"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingTop="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="14dp">
 
-            <Button
-                android:id="@+id/allowButton"
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="58dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="@drawable/card_status"
-                android:gravity="center"
-                android:minHeight="0dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:text="🔓  ALLOW"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/statusButton"
-                android:layout_width="0dp"
-                android:layout_height="58dp"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
-                android:background="@drawable/card_status"
-                android:gravity="center"
-                android:minHeight="0dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:text="↻  REFRESH"
-                android:textAllCaps="false"
-                android:textColor="#C7CBD4"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MAC RESTRICTION"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/restrictionHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Slide ON to restrict  •  Slide OFF to allow"
+                    android:textColor="#7F8AA0"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/restrictionSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Mac restriction toggle"
+                android:showText="false"
+                android:splitTrack="false"
+                android:thumb="@drawable/switch_thumb"
+                android:track="@drawable/switch_track" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/statusButton"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/card_status"
+            android:gravity="center"
+            android:minHeight="0dp"
+            android:singleLine="true"
+            android:text="↻  REFRESH STATUS"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:id="@+id/screenCard"
@@ -495,7 +500,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="View your Mac remotely • 720p / 30 FPS max"
+                    android:text="View your Mac remotely • up to 1080p / 60 FPS"
                     android:textColor="#858B99"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -545,7 +550,7 @@
                     android:gravity="center"
                     android:minHeight="0dp"
                     android:singleLine="true"
-                    android:text="🔐  LOCK"
+                    android:text="◈  LOCK"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp"
@@ -561,7 +566,7 @@
                     android:gravity="center"
                     android:minHeight="0dp"
                     android:singleLine="true"
-                    android:text="🌙  SLEEP"
+                    android:text="◌  SLEEP"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp"
@@ -656,7 +661,7 @@
                 android:gravity="center"
                 android:minHeight="0dp"
                 android:singleLine="true"
-                android:text="🔇  MUTE"
+                android:text="◉  MUTE"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
