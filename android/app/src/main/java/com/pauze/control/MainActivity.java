@@ -15,7 +15,6 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,7 +46,9 @@ public final class MainActivity extends Activity {
     private TextView uptimeValue;
     private TextView macosValue;
     private TextView volumeValue;
-    private TextView muteButton;
+    private SlideActionView restrictionControl;
+    private SlideActionView muteButton;
+    private boolean macRestricted;
 
     private SeekBar volumeSeek;
 
@@ -56,8 +57,6 @@ public final class MainActivity extends Activity {
     private View systemCard;
     private View powerCard;
     private ScrollView rootScroll;
-    private Switch restrictionSwitch;
-    private boolean updatingRestrictionSwitch;
 
     private TextView navDashboard;
     private TextView navActivity;
@@ -131,39 +130,72 @@ public final class MainActivity extends Activity {
         navDashboard = findViewById(R.id.navDashboard);
         navActivity = findViewById(R.id.navActivity);
         navSettings = findViewById(R.id.navSettings);
-        restrictionSwitch = findViewById(R.id.restrictionSwitch);
+        restrictionControl = findViewById(R.id.restrictionCard);
+        muteButton = findViewById(R.id.muteButton);
     }
 
     private void setupActions() {
-        findViewById(R.id.saveButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        this::saveConnection
+        setupSlideAction(
+                R.id.saveButton,
+                "SLIDE TO SAVE CONNECTION",
+                this::saveConnection
+        );
+
+        setupSlideAction(
+                R.id.statusButton,
+                "SLIDE TO REFRESH",
+                () -> refreshStatus(true)
+        );
+
+        restrictionControl.setText(
+                "SLIDE TO RESTRICT"
+        );
+        restrictionControl.setOnSlideCompleteListener(
+                view -> sendCommand(
+                        macRestricted
+                                ? "/v1/allow"
+                                : "/v1/restrict"
                 )
         );
 
-        restrictionSwitch.setOnCheckedChangeListener(
-                (buttonView, isChecked) -> {
-                    if (updatingRestrictionSwitch) {
-                        return;
-                    }
-
-                    animatePress(
-                            buttonView,
-                            () -> sendCommand(
-                                    isChecked
-                                            ? "/v1/restrict"
-                                            : "/v1/allow"
-                            )
-                    );
-                }
+        setupSlideAction(
+                R.id.lockButton,
+                "SLIDE TO LOCK",
+                () -> sendCommand("/v1/lock")
         );
 
+        setupSlideAction(
+                R.id.sleepButton,
+                "SLIDE TO SLEEP",
+                () -> sendCommand("/v1/sleep")
+        );
 
-        findViewById(R.id.statusButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> refreshStatus(true)
+        setupSlideAction(
+                R.id.restartButton,
+                "SLIDE TO RESTART",
+                () -> confirmAction(
+                        "Restart Mac?",
+                        "Slide confirmation received. The Mac will restart.",
+                        "/v1/restart"
+                )
+        );
+
+        setupSlideAction(
+                R.id.shutdownButton,
+                "SLIDE TO SHUT DOWN",
+                () -> confirmAction(
+                        "Shut down Mac?",
+                        "Slide confirmation received. The Mac will shut down.",
+                        "/v1/shutdown"
+                )
+        );
+
+        muteButton.setText("SLIDE TO MUTE");
+        muteButton.setOnSlideCompleteListener(
+                view -> sendCommand(
+                        macMuted
+                                ? "/v1/unmute"
+                                : "/v1/mute"
                 )
         );
 
@@ -171,47 +203,6 @@ public final class MainActivity extends Activity {
                 view -> animateCard(
                         view,
                         this::openScreenViewer
-                )
-        );
-
-        findViewById(R.id.lockButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> sendCommand("/v1/lock")
-                )
-        );
-
-        findViewById(R.id.sleepButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> sendCommand("/v1/sleep")
-                )
-        );
-
-        findViewById(R.id.restartButton).setOnClickListener(
-                view -> confirmAction(
-                        "Restart Mac?",
-                        "The Mac will restart.",
-                        "/v1/restart"
-                )
-        );
-
-        findViewById(R.id.shutdownButton).setOnClickListener(
-                view -> confirmAction(
-                        "Shut down Mac?",
-                        "The Mac will shut down.",
-                        "/v1/shutdown"
-                )
-        );
-
-        muteButton.setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> sendCommand(
-                                macMuted
-                                        ? "/v1/unmute"
-                                        : "/v1/mute"
-                        )
                 )
         );
 
@@ -250,6 +241,20 @@ public final class MainActivity extends Activity {
                         statusCard,
                         () -> refreshStatus(true)
                 )
+        );
+    }
+
+    private void setupSlideAction(
+            int viewId,
+            String label,
+            Runnable action
+    ) {
+        SlideActionView control =
+                findViewById(viewId);
+
+        control.setText(label);
+        control.setOnSlideCompleteListener(
+                view -> action.run()
         );
     }
 
@@ -316,6 +321,11 @@ public final class MainActivity extends Activity {
                 findViewById(R.id.restrictionCard),
                 findViewById(R.id.statusButton),
                 findViewById(R.id.screenCard),
+                findViewById(R.id.lockButton),
+                findViewById(R.id.sleepButton),
+                findViewById(R.id.restartButton),
+                findViewById(R.id.shutdownButton),
+                findViewById(R.id.muteButton),
                 powerCard,
                 findViewById(R.id.securityAnchor),
                 findViewById(R.id.activityAnchor),
@@ -632,9 +642,12 @@ public final class MainActivity extends Activity {
     ) {
         mainHandler.post(
                 () -> {
-                    updatingRestrictionSwitch = true;
-                    restrictionSwitch.setChecked(restricted);
-                    updatingRestrictionSwitch = false;
+                    macRestricted = restricted;
+                    restrictionControl.setText(
+                            restricted
+                                    ? "SLIDE TO ALLOW"
+                                    : "SLIDE TO RESTRICT"
+                    );
 
                     if (restricted) {
                         macStateText.setText(
@@ -811,8 +824,8 @@ public final class MainActivity extends Activity {
 
                     muteButton.setText(
                             macMuted
-                                    ? "◉  UNMUTE"
-                                    : "◉  MUTE"
+                                    ? "SLIDE TO UNMUTE"
+                                    : "SLIDE TO MUTE"
                     );
                 }
         );
