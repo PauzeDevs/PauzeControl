@@ -19,6 +19,18 @@ struct EncodedScreenFrame {
 final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     static let shared = ScreenStreamer()
 
+    // Manual quality choices exposed by the Android live viewer.
+    // 60 FPS is intentionally available only for 720p and 1080p.
+    private struct RequestedQuality {
+        let name: String
+        let maxWidth: Int
+        let maxHeight: Int
+        let defaultFPS: Int
+        let supports60FPS: Bool
+        let bitrate30: Int
+        let bitrate60: Int
+    }
+
     // Hardware-encoder ceiling. The active power profile decides the actual
     // resolution/FPS/bitrate for each streaming session.
     static let maxWidth = 1920
@@ -45,7 +57,166 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var activeBitrate = Self.targetAverageBitrate
     private var activeProfileName = "AC • 1080p • 60 FPS"
 
+    private var requestedQuality = "auto"
+    private var requestedFPS: Int?
+
     private override init() { super.init() }
+
+    func setQuality(
+        _ quality: String,
+        fps: Int?
+    ) -> Bool {
+        guard let requested = qualityOption(quality) else {
+            return false
+        }
+
+        let normalized = quality.lowercased()
+        let selectedFPS: Int
+
+        if normalized == "auto" {
+            selectedFPS = 0
+        } else if let fps {
+            guard fps == 30 || fps == 60 else {
+                return false
+            }
+
+            if fps == 60 && !requested.supports60FPS {
+                return false
+            }
+
+            selectedFPS = fps
+        } else {
+            selectedFPS = requested.defaultFPS
+        }
+
+        queue.async {
+            let changed = self.requestedQuality != normalized ||
+                self.requestedFPS != (selectedFPS == 0 ? nil : selectedFPS)
+
+            self.requestedQuality = normalized
+            self.requestedFPS = selectedFPS == 0 ? nil : selectedFPS
+
+            guard changed, !self.subscribers.isEmpty else {
+                return
+            }
+
+            self.restartCapture()
+        }
+
+        return true
+    }
+
+    private func qualityOption(
+        _ raw: String
+    ) -> RequestedQuality? {
+        switch raw.lowercased() {
+        case "auto":
+            return RequestedQuality(
+                name: "Auto",
+                maxWidth: Self.maxWidth,
+                maxHeight: Self.maxHeight,
+                defaultFPS: Self.maxFPS,
+                supports60FPS: true,
+                bitrate30: 4_000_000,
+                bitrate60: 8_000_000
+            )
+        case "144p":
+            return RequestedQuality(
+                name: "144p",
+                maxWidth: 256,
+                maxHeight: 144,
+                defaultFPS: 30,
+                supports60FPS: false,
+                bitrate30: 300_000,
+                bitrate60: 300_000
+            )
+        case "240p":
+            return RequestedQuality(
+                name: "240p",
+                maxWidth: 426,
+                maxHeight: 240,
+                defaultFPS: 30,
+                supports60FPS: false,
+                bitrate30: 500_000,
+                bitrate60: 500_000
+            )
+        case "360p":
+            return RequestedQuality(
+                name: "360p",
+                maxWidth: 640,
+                maxHeight: 360,
+                defaultFPS: 30,
+                supports60FPS: false,
+                bitrate30: 900_000,
+                bitrate60: 900_000
+            )
+        case "480p":
+            return RequestedQuality(
+                name: "480p",
+                maxWidth: 854,
+                maxHeight: 480,
+                defaultFPS: 30,
+                supports60FPS: false,
+                bitrate30: 1_500_000,
+                bitrate60: 1_500_000
+            )
+        case "720p":
+            return RequestedQuality(
+                name: "720p",
+                maxWidth: 1280,
+                maxHeight: 720,
+                defaultFPS: 30,
+                supports60FPS: true,
+                bitrate30: 4_000_000,
+                bitrate60: 5_000_000
+            )
+        case "1080p":
+            return RequestedQuality(
+                name: "1080p",
+                maxWidth: 1920,
+                maxHeight: 1080,
+                defaultFPS: 30,
+                supports60FPS: true,
+                bitrate30: 6_000_000,
+                bitrate60: 8_000_000
+            )
+        default:
+            return nil
+        }
+    }
+
+    private func restartCapture() {
+        retryWorkItem?.cancel()
+        retryWorkItem = nil
+        captureAttempt = 0
+        starting = false
+
+        if let activeStream = stream {
+            stream = nil
+            activeStream.stopCapture { error in
+                if let error {
+                    print("[PauzeControl] Quality switch stop error: \(error)")
+                }
+            }
+        }
+
+        invalidateEncoder()
+        lastFrameTime = 0
+        outputWidth = 0
+        outputHeight = 0
+        resizePool = nil
+        forceNextKeyframe = true
+
+        guard !subscribers.isEmpty else {
+            return
+        }
+
+        queue.asyncAfter(deadline: .now() + 0.20) { [weak self] in
+            guard let self else { return }
+            guard !self.subscribers.isEmpty, self.stream == nil, !self.starting else { return }
+            self.startCapture()
+        }
+    }
 
     @discardableResult
     func subscribe(_ handler: @escaping (EncodedScreenFrame) -> Void) -> UUID {
@@ -114,14 +285,39 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func startStream(for display: SCDisplay) {
         let sourceWidth = max(Int(display.width), 2)
         let sourceHeight = max(Int(display.height), 2)
-        let profile = SystemService.streamingProfile()
-        activeFPS = min(profile.fps, Self.maxFPS)
-        activeBitrate = profile.bitrate
-        activeProfileName = profile.name
+        let powerProfile = SystemService.streamingProfile()
+        let requested = qualityOption(requestedQuality) ?? qualityOption("auto")!
 
-        let scale = min(1.0, min(Double(profile.maxWidth) / Double(sourceWidth), Double(profile.maxHeight) / Double(sourceHeight)))
-        outputWidth = min(makeEven(max(2, Int(Double(sourceWidth) * scale))), profile.maxWidth)
-        outputHeight = min(makeEven(max(2, Int(Double(sourceHeight) * scale))), profile.maxHeight)
+        let requestedFPS = self.requestedFPS ?? requested.defaultFPS
+        let effectiveFPS = min(requestedFPS, powerProfile.fps, Self.maxFPS)
+        let requestedBitrate = effectiveFPS >= 60 ? requested.bitrate60 : requested.bitrate30
+
+        activeFPS = effectiveFPS
+        activeBitrate = min(requestedBitrate, powerProfile.bitrate)
+
+        let effectiveMaxWidth = min(requested.maxWidth, powerProfile.maxWidth, Self.maxWidth)
+        let effectiveMaxHeight = min(requested.maxHeight, powerProfile.maxHeight, Self.maxHeight)
+
+        let scale = min(
+            1.0,
+            min(
+                Double(effectiveMaxWidth) / Double(sourceWidth),
+                Double(effectiveMaxHeight) / Double(sourceHeight)
+            )
+        )
+
+        outputWidth = min(
+            makeEven(max(2, Int(Double(sourceWidth) * scale))),
+            effectiveMaxWidth
+        )
+        outputHeight = min(
+            makeEven(max(2, Int(Double(sourceHeight) * scale))),
+            effectiveMaxHeight
+        )
+
+        activeProfileName = requestedQuality == "auto"
+            ? powerProfile.name
+            : "\(requested.name) • \(activeFPS) FPS"
         createResizePoolIfNeeded()
 
         print("[PauzeControl] Streaming profile: \(activeProfileName) • \(outputWidth)x\(outputHeight) • \(activeFPS) FPS • \(activeBitrate / 1_000_000) Mbps")
