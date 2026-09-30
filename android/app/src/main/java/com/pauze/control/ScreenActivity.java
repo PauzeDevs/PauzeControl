@@ -32,6 +32,7 @@ public final class ScreenActivity extends Activity
     private String token;
     private boolean surfaceReady;
     private boolean streamError;
+    private boolean shuttingDown;
 
     private int frameCount;
     private long fpsWindowStart;
@@ -71,6 +72,8 @@ public final class ScreenActivity extends Activity
         screenSurface
                 .getHolder()
                 .addCallback(this);
+
+        shuttingDown = false;
 
         fpsWindowStart =
                 System.currentTimeMillis();
@@ -117,9 +120,11 @@ public final class ScreenActivity extends Activity
     ) {
         surfaceReady = false;
         decoderSurface = null;
+        releaseDecoder();
 
-        if (streamClient != null) {
-            streamClient.stop();
+        ScreenStreamClient activeClient = streamClient;
+        if (activeClient != null) {
+            activeClient.stop();
         }
     }
 
@@ -364,13 +369,25 @@ public final class ScreenActivity extends Activity
     public void onClosed() {
         releaseDecoder();
 
-        runOnUiThread(
-                () -> liveStatus.setText(
-                        "● STREAM CLOSED"
-                )
-        );
+        runOnUiThread(() -> {
+            liveStatus.setText("● STREAM CLOSED");
 
-        streamClient = null;
+            // A Surface can be recreated before the old TCP client finishes
+            // closing. In that case the previous startStream() call sees a
+            // non-null client and refuses to start. Restart only after the
+            // old client has fully closed and the new Surface is ready.
+            streamClient = null;
+
+            if (!shuttingDown && surfaceReady &&
+                    host != null && token != null &&
+                    !host.isEmpty() && !token.isEmpty()) {
+                liveStatus.setText("CONNECTING • H.264");
+                screenSurface.postDelayed(
+                        this::startStream,
+                        150
+                );
+            }
+        });
     }
 
     private void releaseDecoder() {
@@ -503,10 +520,15 @@ public final class ScreenActivity extends Activity
 
     @Override
     protected void onDestroy() {
-        if (streamClient != null) {
-            streamClient.stop();
+        shuttingDown = true;
+        surfaceReady = false;
+
+        ScreenStreamClient activeClient = streamClient;
+        if (activeClient != null) {
+            activeClient.stop();
         }
 
+        streamClient = null;
         releaseDecoder();
         super.onDestroy();
     }
