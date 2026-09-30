@@ -515,7 +515,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
-            android:text="POWER & AUDIO"
+            android:text="POWER &amp; AUDIO"
             android:textColor="#747987"
             android:textSize="11sp"
             android:textStyle="bold"
