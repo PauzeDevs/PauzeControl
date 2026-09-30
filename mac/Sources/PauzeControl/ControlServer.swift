@@ -106,14 +106,23 @@ final class ControlServer {
             }
 
             if let request = HTTPRequest.parse(buffer) {
-                let response = self.handle(request)
+                if request.method == "GET",
+                   request.path == "/v1/screen" {
+                    self.startScreenStream(
+                        connection: connection,
+                        request: request
+                    )
+                } else {
+                    let response = self.handle(request)
 
-                connection.send(
-                    content: response,
-                    completion: .contentProcessed { _ in
-                        connection.cancel()
-                    }
-                )
+                    connection.send(
+                        content: response,
+                        completion: .contentProcessed { _ in
+                            connection.cancel()
+                        }
+                    )
+                }
+
                 return
             }
 
@@ -127,6 +136,71 @@ final class ControlServer {
                 accumulated: buffer
             )
         }
+    }
+
+    private func startScreenStream(
+        connection: NWConnection,
+        request: HTTPRequest
+    ) {
+        guard authenticate(request) else {
+            let response = HTTPResponse.json(
+                status: 401,
+                body: ErrorResponse(
+                    ok: false,
+                    error: "Unauthorized"
+                )
+            )
+
+            connection.send(
+                content: response,
+                completion: .contentProcessed { _ in
+                    connection.cancel()
+                }
+            )
+
+            return
+        }
+
+        let header = [
+            "HTTP/1.1 200 OK",
+            "Content-Type: multipart/x-mixed-replace; boundary=pauze-frame",
+            "Cache-Control: no-cache, no-store, must-revalidate",
+            "Pragma: no-cache",
+            "Connection: close",
+            "",
+            ""
+        ].joined(separator: "\r\n")
+
+        let client = ScreenClient(
+            connection: connection,
+            stream: ScreenStreamer.shared
+        )
+
+        connection.stateUpdateHandler = { [weak client] state in
+            switch state {
+            case .cancelled, .failed:
+                client?.close()
+            default:
+                break
+            }
+        }
+
+        connection.send(
+            content: Data(header.utf8),
+            completion: .contentProcessed { [weak client] error in
+                guard let client else {
+                    connection.cancel()
+                    return
+                }
+
+                if error != nil {
+                    client.close()
+                    return
+                }
+
+                client.start()
+            }
+        )
     }
 
     private func handle(_ request: HTTPRequest) -> Data {
@@ -175,7 +249,6 @@ final class ControlServer {
             )
         }
     }
-
     private func authenticate(_ request: HTTPRequest) -> Bool {
         guard
             let timestampString =
@@ -265,6 +338,114 @@ final class ControlServer {
         }
 
         return difference == 0
+    }
+
+}
+
+private final class ScreenClient {
+    private let connection: NWConnection
+    private let stream: ScreenStreamer
+    private let queue = DispatchQueue(
+        label: "com.pauze.control.screen.client",
+        qos: .userInteractive
+    )
+
+    private var subscriberID: UUID?
+    private var sending = false
+    private var pending: (Data, Int, Int)?
+
+    init(
+        connection: NWConnection,
+        stream: ScreenStreamer
+    ) {
+        self.connection = connection
+        self.stream = stream
+    }
+
+    func start() {
+        let id = stream.subscribe { [weak self] jpeg, width, height in
+            self?.enqueue(
+                jpeg: jpeg,
+                width: width,
+                height: height
+            )
+        }
+
+        queue.async {
+            self.subscriberID = id
+        }
+    }
+
+    func close() {
+        queue.async {
+            if let id = self.subscriberID {
+                self.stream.unsubscribe(id)
+                self.subscriberID = nil
+            }
+
+            self.pending = nil
+            self.sending = false
+            self.connection.cancel()
+        }
+    }
+
+    private func enqueue(
+        jpeg: Data,
+        width: Int,
+        height: Int
+    ) {
+        queue.async {
+            guard self.subscriberID != nil else {
+                return
+            }
+
+            self.pending = (jpeg, width, height)
+
+            guard !self.sending else {
+                return
+            }
+
+            self.sendNext()
+        }
+    }
+
+    private func sendNext() {
+        guard let frame = pending else {
+            sending = false
+            return
+        }
+
+        pending = nil
+        sending = true
+
+        var packet = Data(
+            "--pauze-frame\r\n" +
+            "Content-Type: image/jpeg\r\n" +
+            "Content-Length: \(frame.0.count)\r\n" +
+            "X-Pauze-Width: \(frame.1)\r\n" +
+            "X-Pauze-Height: \(frame.2)\r\n\r\n"
+        )
+
+        packet.append(frame.0)
+        packet.append(Data("\r\n".utf8))
+
+        connection.send(
+            content: packet,
+            completion: .contentProcessed { [weak self] error in
+                guard let self else { return }
+
+                self.queue.async {
+                    self.sending = false
+
+                    if error != nil {
+                        self.close()
+                        return
+                    }
+
+                    self.sendNext()
+                }
+            }
+        )
     }
 }
 
