@@ -2,6 +2,7 @@
 
 import AppKit
 import Foundation
+import Darwin
 
 if CommandLine.arguments.contains("--print-token") {
     do {
