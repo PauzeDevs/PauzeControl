@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>PauzeControl</string>
+    <key>CFBundleExecutable</key>
+    <string>PauzeControl</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.pauze.control</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>PauzeControl</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>PauzeControl captures your Mac screen so the paired Android controller can display a private live view.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>PauzeControl uses Apple Events for authorized Mac system controls.</string>
+</dict>
+</plist>
