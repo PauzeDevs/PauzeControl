@@ -427,11 +427,32 @@ public final class ScreenActivity extends Activity
             if (nalStart < nalEnd &&
                     (data[nalStart] & 0x1F) ==
                             wantedType) {
-                return Arrays.copyOfRange(
+                byte[] nal = Arrays.copyOfRange(
                         data,
                         nalStart,
                         nalEnd
                 );
+
+                // MediaCodec expects AVC codec-specific parameter sets
+                // (SPS/PPS) in start-code-prefixed form when supplied
+                // through csd-0 / csd-1.
+                byte[] withStartCode =
+                        new byte[nal.length + 4];
+
+                withStartCode[0] = 0x00;
+                withStartCode[1] = 0x00;
+                withStartCode[2] = 0x00;
+                withStartCode[3] = 0x01;
+
+                System.arraycopy(
+                        nal,
+                        0,
+                        withStartCode,
+                        4,
+                        nal.length
+                );
+
+                return withStartCode;
             }
 
             position = nalEnd;
