@@ -55,9 +55,14 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func startCapture() {
         guard stream == nil, !starting else { return }
-        guard CGPreflightScreenCaptureAccess() else {
-            print("[PauzeControl] Screen Recording permission is not granted.")
-            return
+        // Preflight only checks the current state. It never prompts.
+        // Request access the first time a viewer connects.
+        if !CGPreflightScreenCaptureAccess() {
+            print("[PauzeControl] Requesting Screen Recording permission…")
+            guard CGRequestScreenCaptureAccess() else {
+                print("[PauzeControl] Screen Recording permission was denied.")
+                return
+            }
         }
         starting = true
         SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { [weak self] content, error in
