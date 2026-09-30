@@ -58,6 +58,21 @@ public final class ApiClient {
         );
     }
 
+    public static Result post(
+            String host,
+            String token,
+            String path,
+            String body
+    ) throws Exception {
+        return request(
+                host,
+                token,
+                "POST",
+                path,
+                body
+        );
+    }
+
     public static HttpURLConnection openScreen(
             String host,
             String token
