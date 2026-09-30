@@ -58,6 +58,75 @@ public final class ApiClient {
         );
     }
 
+    public static HttpURLConnection openScreen(
+            String host,
+            String token
+    ) throws Exception {
+        String normalized = host.trim();
+
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Mac address is empty."
+            );
+        }
+
+        if (!normalized.startsWith("http://") &&
+                !normalized.startsWith("https://")) {
+            normalized = "http://" + normalized;
+        }
+
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(
+                    0,
+                    normalized.length() - 1
+            );
+        }
+
+        URI uri = URI.create(
+                normalized + "/v1/screen"
+        );
+
+        HttpURLConnection connection =
+                (HttpURLConnection) uri.toURL().openConnection();
+
+        long timestamp =
+                System.currentTimeMillis() / 1000L;
+
+        String nonce = randomHex(16);
+
+        String signature = sign(
+                token,
+                timestamp,
+                nonce,
+                "GET",
+                "/v1/screen",
+                ""
+        );
+
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(0);
+        connection.setUseCaches(false);
+        connection.setRequestProperty(
+                "Accept",
+                "multipart/x-mixed-replace"
+        );
+        connection.setRequestProperty(
+                "X-Pauze-Timestamp",
+                Long.toString(timestamp)
+        );
+        connection.setRequestProperty(
+                "X-Pauze-Nonce",
+                nonce
+        );
+        connection.setRequestProperty(
+                "X-Pauze-Signature",
+                signature
+        );
+
+        return connection;
+    }
+
     private static Result request(
             String host,
             String token,
