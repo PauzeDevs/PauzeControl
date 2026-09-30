@@ -32,6 +32,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var lastFrameTime: CFTimeInterval = 0
     private var starting = false
     private var forceNextKeyframe = true
+    private var retryWorkItem: DispatchWorkItem?
+    private var captureAttempt = 0
 
     private override init() { super.init() }
 
@@ -54,7 +56,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     private func startCapture() {
-        guard stream == nil, !starting else { return }
+        guard stream == nil, !starting, !subscribers.isEmpty else { return }
+
         // Preflight only checks the current state. It never prompts.
         // Request access the first time a viewer connects.
         if !CGPreflightScreenCaptureAccess() {
@@ -64,54 +67,181 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                 return
             }
         }
+
         starting = true
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { [weak self] content, error in
+        captureAttempt = 0
+        retryWorkItem?.cancel()
+        retryWorkItem = nil
+        loadShareableContent()
+    }
+
+    private func loadShareableContent() {
+        guard !subscribers.isEmpty else {
+            starting = false
+            return
+        }
+
+        // Ask for the full shareable content set. A transient empty display
+        // list can occur while the capture subsystem is refreshing, especially
+        // around login/display state changes. Retry instead of abandoning the
+        // viewer connection.
+        SCShareableContent.getExcludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: false
+        ) { [weak self] content, error in
             guard let self else { return }
+
             self.queue.async {
-                defer { self.starting = false }
-                guard let display = content?.displays.first else {
-                    print("[PauzeControl] Unable to locate a capturable display: \(String(describing: error))")
+                guard !self.subscribers.isEmpty else {
+                    self.starting = false
                     return
                 }
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                let configuration = SCStreamConfiguration()
-                configuration.width = Self.maxWidth
-                configuration.height = Self.maxHeight
-                configuration.scalesToFit = true
-                configuration.preservesAspectRatio = true
-                configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(Self.maxFPS))
-                configuration.queueDepth = 1
-                configuration.pixelFormat = kCVPixelFormatType_32BGRA
-                configuration.showsCursor = true
-                configuration.capturesAudio = false
-                do {
-                    let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
-                    try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: self.queue)
-                    self.stream = stream
-                    stream.startCapture { error in
-                        if let error {
-                            print("[PauzeControl] Screen capture failed: \(error)")
-                            self.queue.async { self.stream = nil; self.invalidateEncoder() }
-                        } else {
-                            print("[PauzeControl] Screen capture started. H.264 ceiling: \(Self.maxWidth)x\(Self.maxHeight) @ \(Self.maxFPS) FPS.")
-                        }
+
+                guard let display = content?.displays.first else {
+                    self.captureAttempt += 1
+
+                    print(
+                        "[PauzeControl] No capturable display yet " +
+                        "(attempt \(self.captureAttempt)/10): " +
+                        "\(String(describing: error))"
+                    )
+
+                    if self.captureAttempt <= 10 {
+                        self.scheduleCaptureRetry()
+                    } else {
+                        print(
+                            "[PauzeControl] Screen capture could not find " +
+                            "a display after 10 attempts."
+                        )
+                        self.starting = false
                     }
-                } catch {
-                    print("[PauzeControl] Unable to attach screen output: \(error)")
-                    self.stream = nil
-                    self.invalidateEncoder()
+
+                    return
                 }
+
+                self.captureAttempt = 0
+                self.startStream(for: display)
             }
         }
     }
 
+    private func startStream(for display: SCDisplay) {
+        let filter = SCContentFilter(
+            display: display,
+            excludingWindows: []
+        )
+
+        let configuration = SCStreamConfiguration()
+        configuration.width = Self.maxWidth
+        configuration.height = Self.maxHeight
+        configuration.scalesToFit = true
+        configuration.preservesAspectRatio = true
+        configuration.minimumFrameInterval = CMTime(
+            value: 1,
+            timescale: CMTimeScale(Self.maxFPS)
+        )
+        configuration.queueDepth = 1
+        configuration.pixelFormat = kCVPixelFormatType_32BGRA
+        configuration.showsCursor = true
+        configuration.capturesAudio = false
+
+        do {
+            let newStream = SCStream(
+                filter: filter,
+                configuration: configuration,
+                delegate: self
+            )
+
+            try newStream.addStreamOutput(
+                self,
+                type: .screen,
+                sampleHandlerQueue: self.queue
+            )
+
+            self.stream = newStream
+
+            newStream.startCapture { [weak self] error in
+                guard let self else { return }
+
+                self.queue.async {
+                    guard !self.subscribers.isEmpty else {
+                        self.starting = false
+                        return
+                    }
+
+                    if let error {
+                        print(
+                            "[PauzeControl] Screen capture failed: \(error)"
+                        )
+
+                        self.stream = nil
+                        self.invalidateEncoder()
+                        self.starting = false
+                        self.scheduleCaptureRetry()
+                    } else {
+                        self.starting = false
+                        print(
+                            "[PauzeControl] Screen capture started. " +
+                            "H.264 ceiling: " +
+                            "\(Self.maxWidth)x\(Self.maxHeight) @ " +
+                            "\(Self.maxFPS) FPS."
+                        )
+                    }
+                }
+            }
+        } catch {
+            print(
+                "[PauzeControl] Unable to attach screen output: \(error)"
+            )
+
+            self.stream = nil
+            self.invalidateEncoder()
+            self.starting = false
+            scheduleCaptureRetry()
+        }
+    }
+
+    private func scheduleCaptureRetry() {
+        guard !subscribers.isEmpty else { return }
+
+        retryWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+
+            self.queue.async {
+                guard !self.subscribers.isEmpty else { return }
+                guard self.stream == nil, !self.starting else { return }
+
+                self.starting = true
+                self.loadShareableContent()
+            }
+        }
+
+        retryWorkItem = workItem
+        queue.asyncAfter(
+            deadline: .now() + 1.0,
+            execute: workItem
+        )
+    }
+
     private func stopCapture() {
+        retryWorkItem?.cancel()
+        retryWorkItem = nil
+        captureAttempt = 0
+        starting = false
+
         if let stream {
             self.stream = nil
             stream.stopCapture { error in
-                if let error { print("[PauzeControl] Screen capture stop error: \(error)") }
+                if let error {
+                    print(
+                        "[PauzeControl] Screen capture stop error: \(error)"
+                    )
+                }
             }
         }
+
         invalidateEncoder()
         lastFrameTime = 0
     }
@@ -203,10 +333,20 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         print("[PauzeControl] Screen stream stopped: \(error)")
+
         queue.async {
+            guard self.stream === stream else { return }
+
             self.stream = nil
             self.invalidateEncoder()
-            if !self.subscribers.isEmpty { self.startCapture() }
+            self.starting = false
+
+            if !self.subscribers.isEmpty {
+                // ScreenCaptureKit can temporarily lose its display source.
+                // Rebuild the content filter instead of leaving the viewer
+                // connected to a dead stream.
+                self.scheduleCaptureRetry()
+            }
         }
     }
 
