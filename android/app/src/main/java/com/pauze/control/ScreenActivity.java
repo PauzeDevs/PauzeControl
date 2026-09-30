@@ -9,6 +9,7 @@ import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.FrameLayout;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -44,6 +45,10 @@ public final class ScreenActivity extends Activity
     private boolean streamError;
     private boolean shuttingDown;
     private boolean controlsVisible = true;
+
+    private int streamWidth;
+    private int streamHeight;
+    private boolean aspectApplied;
 
     private int frameCount;
     private long fpsWindowStart;
@@ -130,13 +135,19 @@ public final class ScreenActivity extends Activity
             int width,
             int height
     ) {
-        // Decoder dimensions follow the incoming H.264 stream.
+        // The SurfaceView itself is sized to the incoming video aspect ratio.
+        // The decoder therefore never stretches a 16:9 Mac frame into a
+        // portrait phone display.
+        if (streamWidth > 0 && streamHeight > 0) {
+            applyVideoAspectRatio(streamWidth, streamHeight);
+        }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         surfaceReady = false;
         decoderSurface = null;
+        aspectApplied = false;
         releaseDecoder();
 
         ScreenStreamClient activeClient = streamClient;
@@ -153,6 +164,9 @@ public final class ScreenActivity extends Activity
         streamError = false;
         frameCount = 0;
         fpsWindowStart = System.currentTimeMillis();
+        streamWidth = 0;
+        streamHeight = 0;
+        aspectApplied = false;
 
         centerControls.setVisibility(View.GONE);
         streamClient = new ScreenStreamClient(host, token, this);
@@ -170,6 +184,9 @@ public final class ScreenActivity extends Activity
         streamInfo.setText("Reconnecting to MacBook Air…");
 
         releaseDecoder();
+        streamWidth = 0;
+        streamHeight = 0;
+        aspectApplied = false;
 
         ScreenStreamClient activeClient = streamClient;
         if (activeClient != null) {
@@ -280,15 +297,82 @@ public final class ScreenActivity extends Activity
                 runOnUiThread(() -> liveStatus.setText(status));
             }
 
+            if (streamWidth != width || streamHeight != height) {
+                streamWidth = width;
+                streamHeight = height;
+                aspectApplied = false;
+            }
+
             final String dimensions = width + " × " + height +
                     "  •  VIEW ONLY  •  H.264";
 
-            runOnUiThread(() -> resolutionText.setText(dimensions));
+            runOnUiThread(() -> {
+                resolutionText.setText(dimensions);
+
+                if (!aspectApplied) {
+                    applyVideoAspectRatio(width, height);
+                }
+            });
 
         } catch (Exception error) {
             streamError = true;
             showErrorState("● DECODER ERROR");
         }
+    }
+
+    /**
+     * Keeps the Mac stream at its real aspect ratio, exactly like a normal
+     * video player. Portrait phones get black letterbox space above/below;
+     * landscape gets a wide player. The frame is never stretched or cropped.
+     */
+    private void applyVideoAspectRatio(int videoWidth, int videoHeight) {
+        if (videoWidth <= 0 || videoHeight <= 0 ||
+                screenSurface == null) {
+            return;
+        }
+
+        View parent = (View) screenSurface.getParent();
+        if (parent == null) {
+            return;
+        }
+
+        int availableWidth = parent.getWidth();
+        int availableHeight = parent.getHeight();
+
+        if (availableWidth <= 0 || availableHeight <= 0) {
+            screenSurface.post(() ->
+                    applyVideoAspectRatio(videoWidth, videoHeight)
+            );
+            return;
+        }
+
+        float videoRatio =
+                (float) videoWidth / (float) videoHeight;
+        float containerRatio =
+                (float) availableWidth / (float) availableHeight;
+
+        int targetWidth;
+        int targetHeight;
+
+        if (containerRatio > videoRatio) {
+            // Container is wider than the Mac stream: fit by height.
+            targetHeight = availableHeight;
+            targetWidth = Math.round(targetHeight * videoRatio);
+        } else {
+            // Container is taller/narrower: fit by width.
+            targetWidth = availableWidth;
+            targetHeight = Math.round(targetWidth / videoRatio);
+        }
+
+        FrameLayout.LayoutParams params =
+                (FrameLayout.LayoutParams) screenSurface.getLayoutParams();
+
+        params.width = targetWidth;
+        params.height = targetHeight;
+        params.gravity = android.view.Gravity.CENTER;
+
+        screenSurface.setLayoutParams(params);
+        aspectApplied = true;
     }
 
     private void drainDecoder(MediaCodec activeDecoder) {
@@ -312,7 +396,13 @@ public final class ScreenActivity extends Activity
                         final String value = width + " × " + height +
                                 "  •  VIEW ONLY  •  H.264";
 
-                        runOnUiThread(() -> resolutionText.setText(value));
+                        runOnUiThread(() -> {
+                            resolutionText.setText(value);
+                            streamWidth = width;
+                            streamHeight = height;
+                            aspectApplied = false;
+                            applyVideoAspectRatio(width, height);
+                        });
                     }
                 }
 
@@ -336,6 +426,7 @@ public final class ScreenActivity extends Activity
         runOnUiThread(() -> {
             liveStatus.setText("● STREAM CLOSED");
             streamClient = null;
+            aspectApplied = false;
 
             if (!shuttingDown && surfaceReady &&
                     host != null && token != null &&
