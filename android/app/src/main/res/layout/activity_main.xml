@@ -403,68 +403,21 @@
             android:textStyle="bold"
             android:letterSpacing="0.20" />
 
-        <LinearLayout
+        <com.pauze.control.SlideActionView
             android:id="@+id/restrictionCard"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="58dp"
             android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="18dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="14dp">
+            android:contentDescription="Slide to change Mac restriction"
+            android:text="SLIDE TO RESTRICT" />
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="MAC RESTRICTION"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/restrictionHint"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Slide ON to restrict  •  Slide OFF to allow"
-                    android:textColor="#7F8AA0"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <Switch
-                android:id="@+id/restrictionSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="Mac restriction toggle"
-                android:showText="false"
-                android:splitTrack="false"
-                android:thumb="@drawable/switch_thumb"
-                android:track="@drawable/switch_track" />
-        </LinearLayout>
-
-        <Button
+        <com.pauze.control.SlideActionView
             android:id="@+id/statusButton"
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:gravity="center"
-            android:minHeight="0dp"
-            android:singleLine="true"
-            android:text="↻  REFRESH STATUS"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:contentDescription="Slide to refresh Mac status"
+            android:text="SLIDE TO REFRESH" />
 
         <LinearLayout
             android:id="@+id/screenCard"
@@ -540,37 +493,23 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <Button
+                <com.pauze.control.SlideActionView
                     android:id="@+id/lockButton"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="5dp"
-                    android:background="@drawable/card_status"
-                    android:gravity="center"
-                    android:minHeight="0dp"
-                    android:singleLine="true"
-                    android:text="◈  LOCK"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:contentDescription="Slide to lock Mac"
+                    android:text="LOCK" />
 
-                <Button
+                <com.pauze.control.SlideActionView
                     android:id="@+id/sleepButton"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginStart="5dp"
-                    android:background="@drawable/card_status"
-                    android:gravity="center"
-                    android:minHeight="0dp"
-                    android:singleLine="true"
-                    android:text="◌  SLEEP"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:contentDescription="Slide to sleep Mac"
+                    android:text="SLEEP" />
             </LinearLayout>
 
             <LinearLayout
@@ -579,37 +518,23 @@
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal">
 
-                <Button
+                <com.pauze.control.SlideActionView
                     android:id="@+id/restartButton"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="5dp"
-                    android:background="@drawable/button_primary"
-                    android:gravity="center"
-                    android:minHeight="0dp"
-                    android:singleLine="true"
-                    android:text="↻  RESTART"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:contentDescription="Slide to restart Mac"
+                    android:text="RESTART" />
 
-                <Button
+                <com.pauze.control.SlideActionView
                     android:id="@+id/shutdownButton"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginStart="5dp"
-                    android:background="@drawable/button_primary"
-                    android:gravity="center"
-                    android:minHeight="0dp"
-                    android:singleLine="true"
-                    android:text="⏻  SHUT DOWN"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:contentDescription="Slide to shut down Mac"
+                    android:text="SHUT DOWN" />
             </LinearLayout>
 
             <View
@@ -652,20 +577,13 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <Button
+            <com.pauze.control.SlideActionView
                 android:id="@+id/muteButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="54dp"
                 android:layout_marginTop="4dp"
-                android:background="@drawable/card_status"
-                android:gravity="center"
-                android:minHeight="0dp"
-                android:singleLine="true"
-                android:text="◉  MUTE"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:contentDescription="Slide to mute or unmute Mac audio"
+                android:text="MUTE" />
         </LinearLayout>
 
         <TextView
@@ -792,18 +710,13 @@
             android:textColor="#FFFFFF"
             android:textColorHint="#626875" />
 
-        <Button
+        <com.pauze.control.SlideActionView
             android:id="@+id/saveButton"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="10dp"
-            android:background="@drawable/card_status"
-            android:gravity="center"
-            android:minHeight="0dp"
-            android:text="SAVE CONNECTION"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:contentDescription="Slide to save Mac connection"
+            android:text="SLIDE TO SAVE CONNECTION" />
 
         <TextView
             android:layout_width="match_parent"
