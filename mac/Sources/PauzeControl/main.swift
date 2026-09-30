@@ -12,10 +12,10 @@ if CommandLine.arguments.contains("--print-token") {
             "Unable to load pairing secret: \(error.localizedDescription)\n",
             stderr
         )
-        exit(1)
+        exit(EXIT_FAILURE)
     }
 
-    exit(0)
+    exit(EXIT_SUCCESS)
 }
 
 let application = NSApplication.shared
