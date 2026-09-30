@@ -11,8 +11,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
-import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,10 +27,15 @@ public final class MainActivity extends Activity {
     private TextView macStateText;
     private TextView macNameText;
     private TextView connectionPill;
+    private TextView navDashboard;
+    private TextView navActivity;
+    private TextView navSettings;
     private View statusCard;
     private View restrictButton;
     private View allowButton;
     private View content;
+    private View activityCard;
+    private ScrollView rootScroll;
 
     private SecureStore secureStore;
     private ExecutorService executor;
@@ -39,10 +44,10 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_main);
 
         content = findViewById(R.id.content);
+        rootScroll = findViewById(R.id.rootScroll);
         statusCard = findViewById(R.id.statusCard);
         restrictButton = findViewById(R.id.restrictButton);
         allowButton = findViewById(R.id.allowButton);
@@ -52,11 +57,16 @@ public final class MainActivity extends Activity {
         macStateText = findViewById(R.id.macStateText);
         macNameText = findViewById(R.id.macNameText);
         connectionPill = findViewById(R.id.connectionPill);
+        navDashboard = findViewById(R.id.navDashboard);
+        navActivity = findViewById(R.id.navActivity);
+        navSettings = findViewById(R.id.navSettings);
+        activityCard = findViewById(R.id.activityCard);
 
         secureStore = new SecureStore(this);
         executor = Executors.newSingleThreadExecutor();
 
         animateEntrance();
+        setupNavigation();
         loadSavedConnection();
 
         findViewById(R.id.saveButton)
@@ -79,9 +89,37 @@ public final class MainActivity extends Activity {
         findViewById(R.id.statusButton)
                 .setOnClickListener(view -> checkStatus());
 
-        statusCard.setOnClickListener(
-                view -> checkStatus()
+        statusCard.setOnClickListener(view -> checkStatus());
+    }
+
+    private void setupNavigation() {
+        navDashboard.setOnClickListener(
+                view -> scrollTo(statusCard, navDashboard)
         );
+
+        navActivity.setOnClickListener(
+                view -> scrollTo(activityCard, navActivity)
+        );
+
+        navSettings.setOnClickListener(
+                view -> scrollTo(hostInput, navSettings)
+        );
+    }
+
+    private void scrollTo(View target, TextView selected) {
+        rootScroll.post(() -> rootScroll.smoothScrollTo(
+                0,
+                Math.max(0, target.getTop() - 20)
+        ));
+
+        setActiveNav(selected);
+    }
+
+    private void setActiveNav(TextView selected) {
+        navDashboard.setTextColor(Color.rgb(115, 121, 136));
+        navActivity.setTextColor(Color.rgb(115, 121, 136));
+        navSettings.setTextColor(Color.rgb(115, 121, 136));
+        selected.setTextColor(Color.WHITE);
     }
 
     private void animateEntrance() {
@@ -96,29 +134,9 @@ public final class MainActivity extends Activity {
         intro.setDuration(600);
         intro.setInterpolator(new DecelerateInterpolator());
         intro.start();
-
-        animateOnScroll();
     }
 
-    private void animateOnScroll() {
-        final android.widget.ScrollView scroll =
-                findViewById(R.id.rootScroll);
-
-        scroll.getViewTreeObserver().addOnScrollChangedListener(
-                () -> {
-                    int distance = scroll.getScrollY();
-                    float offset = Math.min(distance / 280f, 1f);
-
-                    statusCard.setScaleX(1f - (offset * 0.015f));
-                    statusCard.setScaleY(1f - (offset * 0.015f));
-                }
-        );
-    }
-
-    private void animatePressAndRun(
-            View target,
-            Runnable action
-    ) {
+    private void animatePressAndRun(View target, Runnable action) {
         target.animate()
                 .scaleX(0.97f)
                 .scaleY(0.97f)
@@ -142,9 +160,7 @@ public final class MainActivity extends Activity {
             try {
                 String token = secureStore.getToken();
 
-                mainHandler.post(
-                        () -> tokenInput.setText(token)
-                );
+                mainHandler.post(() -> tokenInput.setText(token));
 
                 if (!host.isEmpty() && !token.isEmpty()) {
                     checkStatusInternal(host, token);
@@ -187,19 +203,14 @@ public final class MainActivity extends Activity {
                 String token = secureStore.getToken();
 
                 if (host.isEmpty() || token.isEmpty()) {
-                    throw new IllegalStateException(
-                            "Save the connection first."
-                    );
+                    throw new IllegalStateException("Save the connection first.");
                 }
 
                 setStatus("Sending command…");
-                ApiClient.Result result =
-                        ApiClient.post(host, token, endpoint);
+                ApiClient.Result result = ApiClient.post(host, token, endpoint);
 
                 if (result.code < 200 || result.code >= 300) {
-                    throw new IllegalStateException(
-                            "Mac returned HTTP " + result.code
-                    );
+                    throw new IllegalStateException("Mac returned HTTP " + result.code);
                 }
 
                 boolean restricted = ApiClient.restricted(result.body);
@@ -217,9 +228,7 @@ public final class MainActivity extends Activity {
                 String token = secureStore.getToken();
 
                 if (host.isEmpty() || token.isEmpty()) {
-                    throw new IllegalStateException(
-                            "Save the connection first."
-                    );
+                    throw new IllegalStateException("Save the connection first.");
                 }
 
                 checkStatusInternal(host, token);
@@ -229,23 +238,14 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private void checkStatusInternal(
-            String host,
-            String token
-    ) throws Exception {
-        ApiClient.Result result =
-                ApiClient.get(host, token, "/v1/status");
+    private void checkStatusInternal(String host, String token) throws Exception {
+        ApiClient.Result result = ApiClient.get(host, token, "/v1/status");
 
         if (result.code < 200 || result.code >= 300) {
-            throw new IllegalStateException(
-                    "Mac returned HTTP " + result.code
-            );
+            throw new IllegalStateException("Mac returned HTTP " + result.code);
         }
 
-        updateState(
-                ApiClient.restricted(result.body)
-        );
-
+        updateState(ApiClient.restricted(result.body));
         setStatus("Live • synced with your Mac");
     }
 
@@ -270,11 +270,10 @@ public final class MainActivity extends Activity {
         statusCard.animate()
                 .alpha(0.72f)
                 .setDuration(80)
-                .withEndAction(() ->
-                        statusCard.animate()
-                                .alpha(1f)
-                                .setDuration(220)
-                                .start())
+                .withEndAction(() -> statusCard.animate()
+                        .alpha(1f)
+                        .setDuration(220)
+                        .start())
                 .start();
     }
 
@@ -294,32 +293,21 @@ public final class MainActivity extends Activity {
     }
 
     private void showError(String message) {
-        final String safe =
-                message == null || message.trim().isEmpty()
-                        ? "Unknown error."
-                        : message;
+        final String safe = message == null || message.trim().isEmpty()
+                ? "Unknown error."
+                : message;
 
         mainHandler.post(() -> {
             statusText.setText("🔴 " + safe);
             connectionPill.setText("● OFFLINE");
-            connectionPill.setTextColor(
-                    Color.rgb(170, 174, 185)
-            );
+            connectionPill.setTextColor(Color.rgb(170, 174, 185));
 
-            Toast.makeText(
-                    this,
-                    safe,
-                    Toast.LENGTH_SHORT
-            ).show();
+            Toast.makeText(this, safe, Toast.LENGTH_SHORT).show();
         });
     }
 
     private void toast(String message) {
-        Toast.makeText(
-                this,
-                message,
-                Toast.LENGTH_SHORT
-        ).show();
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
