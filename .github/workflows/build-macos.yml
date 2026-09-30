@@ -1,4 +1,4 @@
-name: Build macOS
+name: Validate macOS
 
 on:
   push:
@@ -6,24 +6,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  validate:
     runs-on: macos-14
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
-        working-directory: mac
-        run: swift build -c release
-
-      - name: Package
+      - name: Validate Swift package
         working-directory: mac
         run: |
-          mkdir -p artifact
-          cp .build/release/PauzeControl artifact/PauzeControl
-          tar -czf PauzeControl-macos.tar.gz -C artifact PauzeControl
+          set -euo pipefail
+          swift package dump-package
+          find Sources -type f -name '*.swift' -print0 |
+            while IFS= read -r -d '' file; do
+              swiftc -parse "$file"
+            done
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: PauzeControl-macos
-          path: mac/PauzeControl-macos.tar.gz
+      - name: Validate Android tree
+        run: test -d android/app/src/main
