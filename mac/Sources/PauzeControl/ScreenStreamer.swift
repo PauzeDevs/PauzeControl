@@ -53,8 +53,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var forceNextKeyframe = true
     private var retryWorkItem: DispatchWorkItem?
     private var captureAttempt = 0
-    private var activeFPS = Self.maxFPS
-    private var activeBitrate = Self.targetAverageBitrate
+    private var activeFPS = ScreenStreamer.maxFPS
+    private var activeBitrate = ScreenStreamer.targetAverageBitrate
     private var activeProfileName = "AC • 1080p • 60 FPS"
 
     private var requestedQuality = "auto"
