@@ -20,105 +20,72 @@ import javax.crypto.spec.GCMParameterSpec;
 public final class SecureStore {
     private static final String PREFS = "pauze_secure";
     private static final String TOKEN = "token";
-    private static final String KEY_ALIAS = "PauzeControlKey";
+    private static final String KEY_ALIAS = "PauzeControlKeyV2";
+    private static final int IV_LENGTH = 12;
+    private static final int TAG_LENGTH = 128;
 
     private final SharedPreferences prefs;
 
     public SecureStore(Context context) {
-        prefs = context.getSharedPreferences(
-                PREFS,
-                Context.MODE_PRIVATE
-        );
+        prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     public void putToken(String token) throws Exception {
-        byte[] iv = new byte[12];
+        byte[] iv = new byte[IV_LENGTH];
         new java.security.SecureRandom().nextBytes(iv);
 
-        Cipher cipher = Cipher.getInstance(
-                "AES/GCM/NoPadding"
-        );
-
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(
                 Cipher.ENCRYPT_MODE,
                 getOrCreateKey(),
-                new GCMParameterSpec(128, iv)
+                new GCMParameterSpec(TAG_LENGTH, iv)
         );
 
         byte[] ciphertext = cipher.doFinal(
                 token.getBytes(StandardCharsets.UTF_8)
         );
 
-        byte[] packed = new byte[
-                iv.length + ciphertext.length
-        ];
-
-        System.arraycopy(
-                iv,
-                0,
-                packed,
-                0,
-                iv.length
-        );
-
+        byte[] packed = new byte[IV_LENGTH + ciphertext.length];
+        System.arraycopy(iv, 0, packed, 0, IV_LENGTH);
         System.arraycopy(
                 ciphertext,
                 0,
                 packed,
-                iv.length,
+                IV_LENGTH,
                 ciphertext.length
         );
 
         prefs.edit()
                 .putString(
                         TOKEN,
-                        Base64.encodeToString(
-                                packed,
-                                Base64.NO_WRAP
-                        )
+                        Base64.encodeToString(packed, Base64.NO_WRAP)
                 )
                 .apply();
     }
 
     public String getToken() throws Exception {
-        String encoded = prefs.getString(
-                TOKEN,
-                null
-        );
-
+        String encoded = prefs.getString(TOKEN, null);
         if (encoded == null || encoded.isEmpty()) {
             return "";
         }
 
-        byte[] packed = Base64.decode(
-                encoded,
-                Base64.DEFAULT
-        );
-
-        if (packed.length < 13) {
+        byte[] packed = Base64.decode(encoded, Base64.DEFAULT);
+        if (packed.length <= IV_LENGTH) {
             return "";
         }
 
-        byte[] iv = Arrays.copyOfRange(
-                packed,
-                0,
-                12
-        );
-
+        byte[] iv = Arrays.copyOfRange(packed, 0, IV_LENGTH);
         byte[] ciphertext = Arrays.copyOfRange(
                 packed,
-                12,
+                IV_LENGTH,
                 packed.length
         );
 
-        Cipher cipher = Cipher.getInstance(
-                "AES/GCM/NoPadding"
-        );
-
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(
                 Cipher.DECRYPT_MODE,
                 getOrCreateKey(),
-                new GCMParameterSpec(128, iv)
+                new GCMParameterSpec(TAG_LENGTH, iv)
         );
 
         return new String(
@@ -128,28 +95,23 @@ public final class SecureStore {
     }
 
     private SecretKey getOrCreateKey() throws Exception {
-        KeyStore keyStore = KeyStore.getInstance(
-                "AndroidKeyStore"
-        );
-
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
         if (keyStore.containsAlias(KEY_ALIAS)) {
             KeyStore.SecretKeyEntry entry =
-                    (KeyStore.SecretKeyEntry)
-                            keyStore.getEntry(
-                                    KEY_ALIAS,
-                                    null
-                            );
+                    (KeyStore.SecretKeyEntry) keyStore.getEntry(
+                            KEY_ALIAS,
+                            null
+                    );
 
             return entry.getSecretKey();
         }
 
-        KeyGenerator generator =
-                KeyGenerator.getInstance(
-                        KeyProperties.KEY_ALGORITHM_AES,
-                        "AndroidKeyStore"
-                );
+        KeyGenerator generator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES,
+                "AndroidKeyStore"
+        );
 
         generator.init(
                 new KeyGenParameterSpec.Builder(
@@ -157,13 +119,15 @@ public final class SecureStore {
                         KeyProperties.PURPOSE_ENCRYPT |
                                 KeyProperties.PURPOSE_DECRYPT
                 )
-                        .setBlockModes(
-                                KeyProperties.BLOCK_MODE_GCM
-                        )
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                         .setEncryptionPaddings(
-                                KeyProperties
-                                        .ENCRYPTION_PADDING_NONE
+                                KeyProperties.ENCRYPTION_PADDING_NONE
                         )
+                        // The IV is generated randomly by this class and
+                        // stored alongside the ciphertext. Android Keystore
+                        // must allow that IV to be supplied again for GCM
+                        // decryption.
+                        .setRandomizedEncryptionRequired(false)
                         .setUserAuthenticationRequired(false)
                         .build()
         );
