@@ -36,7 +36,7 @@ PauzeControl includes a view-only live Mac screen path:
 - The stream uses the same authenticated control secret to authorize the initial connection.
 - Tailscale is intended as the private network transport.
 
-The stream is a live JPEG frame stream in the current implementation. Its practical frame rate and bandwidth depend on the network and the Mac, but the application enforces a 720p/30 FPS ceiling.
+The stream is a true H.264 video stream, not a sequence of JPEG images. macOS captures the selected display with ScreenCaptureKit and encodes it with VideoToolbox. Android decodes it with MediaCodec. The pipeline enforces a hard maximum of 1280×720 and 30 FPS while preserving the Mac display aspect ratio.
 
 ## Security
 
@@ -65,7 +65,7 @@ The Android app is designed around a dark, cinematic control-center layout with:
 
 The Mac side requires macOS 14 or newer for the current Swift package target.
 
-Screen viewing requires the user to grant macOS Screen Recording permission to the PauzeControl process.
+Screen viewing requires the user to grant macOS Screen Recording permission to the PauzeControl app. After changing Screen Recording permission, restart PauzeControl so ScreenCaptureKit can use the updated authorization.
 
 Accessibility/Input Monitoring permissions may also be required for the restriction layer to block normal user input.
 
@@ -78,7 +78,7 @@ From the mac/ directory:
     swift package dump-package
     swift build -c release
 
-The repository also contains mac/install.sh for installing the executable as a per-user LaunchAgent.
+The repository also contains mac/install.sh for installing PauzeControl as a per-user app bundle and Aqua-session LaunchAgent. The bundle includes the Screen Recording usage description required by macOS.
 
 ### Android
 
