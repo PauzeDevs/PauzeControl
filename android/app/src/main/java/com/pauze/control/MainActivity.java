@@ -15,6 +15,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -55,6 +56,8 @@ public final class MainActivity extends Activity {
     private View systemCard;
     private View powerCard;
     private ScrollView rootScroll;
+    private Switch restrictionSwitch;
+    private boolean updatingRestrictionSwitch;
 
     private TextView navDashboard;
     private TextView navActivity;
@@ -128,6 +131,7 @@ public final class MainActivity extends Activity {
         navDashboard = findViewById(R.id.navDashboard);
         navActivity = findViewById(R.id.navActivity);
         navSettings = findViewById(R.id.navSettings);
+        restrictionSwitch = findViewById(R.id.restrictionSwitch);
     }
 
     private void setupActions() {
@@ -138,19 +142,23 @@ public final class MainActivity extends Activity {
                 )
         );
 
-        findViewById(R.id.restrictButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> sendCommand("/v1/restrict")
-                )
+        restrictionSwitch.setOnCheckedChangeListener(
+                (buttonView, isChecked) -> {
+                    if (updatingRestrictionSwitch) {
+                        return;
+                    }
+
+                    animatePress(
+                            buttonView,
+                            () -> sendCommand(
+                                    isChecked
+                                            ? "/v1/restrict"
+                                            : "/v1/allow"
+                            )
+                    );
+                }
         );
 
-        findViewById(R.id.allowButton).setOnClickListener(
-                view -> animatePress(
-                        view,
-                        () -> sendCommand("/v1/allow")
-                )
-        );
 
         findViewById(R.id.statusButton).setOnClickListener(
                 view -> animatePress(
@@ -305,8 +313,7 @@ public final class MainActivity extends Activity {
         View[] views = {
                 statusCard,
                 systemCard,
-                findViewById(R.id.restrictButton),
-                findViewById(R.id.allowButton),
+                findViewById(R.id.restrictionCard),
                 findViewById(R.id.statusButton),
                 findViewById(R.id.screenCard),
                 powerCard,
@@ -325,51 +332,54 @@ public final class MainActivity extends Activity {
         }
 
         rootScroll.setOnScrollChangeListener(
-                (v, sx, sy, osx, osy) -> {
-                    for (View view : views) {
-                        reveal(view);
-                    }
-                }
+                (v, sx, sy, osx, osy) -> refreshRevealStates(views)
         );
 
-        rootScroll.post(
-                () -> {
-                    for (View view : views) {
-                        reveal(view);
-                    }
-                }
-        );
+        rootScroll.post(() -> refreshRevealStates(views));
     }
 
-    private void reveal(View view) {
-        if (Boolean.TRUE.equals(view.getTag()) ||
-                !view.isShown()) {
+    private void refreshRevealStates(View[] views) {
+        for (View view : views) {
+            updateRevealState(view);
+        }
+    }
+
+    private void updateRevealState(View view) {
+        if (!view.isShown()) {
             return;
         }
 
         int[] location = new int[2];
         view.getLocationOnScreen(location);
 
-        int height =
-                getResources()
-                        .getDisplayMetrics()
-                        .heightPixels;
+        int screenHeight =
+                getResources().getDisplayMetrics().heightPixels;
 
-        if (location[1] + view.getHeight() < 70 ||
-                location[1] > height - 40) {
-            return;
+        boolean visible =
+                location[1] + view.getHeight() > 80 &&
+                        location[1] < screenHeight - 50;
+
+        boolean revealed = Boolean.TRUE.equals(view.getTag());
+
+        if (visible && !revealed) {
+            view.setTag(Boolean.TRUE);
+            view.setAlpha(0f);
+            view.setTranslationY(24f);
+
+            view.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(380)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        } else if (!visible && revealed) {
+            view.setTag(Boolean.FALSE);
+            view.animate()
+                    .alpha(0f)
+                    .translationY(18f)
+                    .setDuration(220)
+                    .start();
         }
-
-        view.setTag(Boolean.TRUE);
-
-        view.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(420)
-                .setInterpolator(
-                        new DecelerateInterpolator()
-                )
-                .start();
     }
 
     private void animateEntrance() {
@@ -622,6 +632,10 @@ public final class MainActivity extends Activity {
     ) {
         mainHandler.post(
                 () -> {
+                    updatingRestrictionSwitch = true;
+                    restrictionSwitch.setChecked(restricted);
+                    updatingRestrictionSwitch = false;
+
                     if (restricted) {
                         macStateText.setText(
                                 "Restricted • awaiting ALLOW"
@@ -797,8 +811,8 @@ public final class MainActivity extends Activity {
 
                     muteButton.setText(
                             macMuted
-                                    ? "🔊  UNMUTE"
-                                    : "🔇  MUTE"
+                                    ? "◉  UNMUTE"
+                                    : "◉  MUTE"
                     );
                 }
         );
@@ -1014,7 +1028,7 @@ public final class MainActivity extends Activity {
         mainHandler.post(
                 () -> {
                     statusText.setText(
-                            "🔴 " + safe
+                            "● " + safe
                     );
 
                     connectionPill.setText(
