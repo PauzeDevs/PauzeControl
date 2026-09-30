@@ -90,6 +90,10 @@ public final class MainActivity extends Activity {
                 .setOnClickListener(view -> checkStatus());
 
         statusCard.setOnClickListener(view -> checkStatus());
+
+        findViewById(R.id.screenCard).setOnClickListener(
+                view -> openScreenViewer()
+        );
     }
 
     private void setupNavigation() {
@@ -148,6 +152,43 @@ public final class MainActivity extends Activity {
                         .withEndAction(action)
                         .start())
                 .start();
+    }
+
+    private void openScreenViewer() {
+        executor.execute(() -> {
+            try {
+                String host =
+                        hostInput.getText()
+                                .toString()
+                                .trim();
+
+                String token =
+                        secureStore.getToken();
+
+                if (host.isEmpty() ||
+                        token.isEmpty()) {
+                    throw new IllegalStateException(
+                            "Save the Mac connection first."
+                    );
+                }
+
+                mainHandler.post(() -> {
+                    android.content.Intent intent =
+                            new android.content.Intent(
+                                    this,
+                                    ScreenActivity.class
+                            );
+
+                    intent.putExtra("host", host);
+                    intent.putExtra("token", token);
+
+                    startActivity(intent);
+                });
+
+            } catch (Exception error) {
+                showError(error.getMessage());
+            }
+        });
     }
 
     private void loadSavedConnection() {
