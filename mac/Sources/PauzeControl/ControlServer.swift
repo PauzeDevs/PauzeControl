@@ -239,6 +239,46 @@ final class ControlServer {
         }
 
         switch (request.method, request.path) {
+        case ("POST", "/v1/screen/quality"):
+            guard
+                let bodyData = request.body.data(using: .utf8),
+                let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                let quality = object["quality"] as? String
+            else {
+                return HTTPResponse.json(
+                    status: 400,
+                    body: ErrorResponse(
+                        ok: false,
+                        error: "Quality must be one of auto, 144p, 240p, 360p, 480p, 720p or 1080p."
+                    )
+                )
+            }
+
+            let requestedFPS = (object["fps"] as? NSNumber)?.intValue
+            let accepted = ScreenStreamer.shared.setQuality(
+                quality,
+                fps: requestedFPS
+            )
+
+            guard accepted else {
+                return HTTPResponse.json(
+                    status: 400,
+                    body: ErrorResponse(
+                        ok: false,
+                        error: "Invalid quality/FPS combination. 60 FPS is available only for 720p and 1080p."
+                    )
+                )
+            }
+
+            return HTTPResponse.json(
+                status: 200,
+                body: ScreenQualityResponse(
+                    ok: true,
+                    quality: quality.lowercased(),
+                    fps: requestedFPS ?? 0
+                )
+            )
+
         case ("GET", "/v1/status"):
             return HTTPResponse.json(
                 status: 200,
@@ -356,6 +396,12 @@ final class ControlServer {
             )
         }
     }
+
+private struct ScreenQualityResponse: Codable {
+    let ok: Bool
+    let quality: String
+    let fps: Int
+}
 
     private func executeSystemCommand(
         name: String,
