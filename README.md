@@ -1,6 +1,6 @@
 # PAUZE CONTROL
 
-> Private Mac → Android remote control and H.264 live screen viewer for your own macOS device.
+> Private Mac → Android remote control and adaptive H.264 live screen viewer for your own macOS device.
 
 PauzeControl is a two-part system built around a private connection between an Android controller and a Mac agent. It is designed to give you a clean control-center experience without relying on a paid cloud/API service.
 
@@ -10,12 +10,18 @@ PauzeControl is a two-part system built around a private connection between an A
 
 - Real-time **H.264** screen streaming from macOS to Android.
 - Native macOS capture using **ScreenCaptureKit**.
-- Native H.264 encoding through **VideoToolbox**.
+- Native hardware-accelerated H.264 encoding through **VideoToolbox**.
 - Android hardware decoding through **MediaCodec**.
-- Hard maximum of **1280×720 (720p)** and **30 FPS**.
+- Adaptive streaming profiles:
+  - 🔌 **On charger:** up to **1920×1080 (1080p) / 60 FPS**.
+  - 🔋 **Battery ≥30%:** up to **1280×720 / 30 FPS**.
+  - 🪫 **Battery <30%:** up to **1280×720 / 20 FPS**.
+  - 🪫 **Battery <15%:** up to **1280×720 / 15 FPS** saver mode.
 - Preserves the Mac display's aspect ratio instead of stretching the image.
 - Dedicated fullscreen viewer with live stream information.
 - View-only streaming — the Android viewer does not directly control the Mac screen.
+
+The stream is only started while there is an active viewer. When nobody is watching, the capture and encoder stop completely to avoid unnecessary CPU/GPU, memory and battery use.
 
 ### 🔒 Remote Restriction
 
@@ -53,8 +59,6 @@ The Mac status endpoint can provide:
 - Audio state/telemetry
 
 The Android controller refreshes the dashboard while it is open.
-
-Screen streaming is power-aware: on AC power it can use up to 30 FPS / 4 Mbps. On battery it automatically reduces capture rate and bitrate, with a stronger saver profile at low battery levels. The stream also stops completely when there are no active viewers, avoiding continuous screen-capture/encoding while idle.
 
 ### 📱 Android Control Center
 
@@ -138,11 +142,11 @@ PauzeControl/
 
 PauzeControl is a software control/restriction layer, not a hardware security boundary. Someone with physical access to the Mac can still force a power-off, boot into another environment, use recovery tools, or otherwise act outside the logged-in session.
 
-Live screen streaming also depends on macOS permissions and the available CPU/GPU/network resources. Actual FPS can vary depending on the Mac, display, network and current workload; **720p/30 FPS is the configured maximum, not a guaranteed minimum.**
+Live screen streaming depends on macOS permissions and the available CPU/GPU/network resources. The configured profile is a maximum target; actual FPS can vary depending on the Mac, display, network, thermal state and current workload. 1080p/60 FPS is used only while the Mac reports AC/charging power.
 
 ## 🚧 Project Status
 
-PauzeControl is actively being developed. The current build includes the Android control center, authenticated Mac controls, system telemetry and the H.264 live-screen pipeline. Further work includes polishing the macOS background service/auto-start experience and continued testing across different Mac configurations.
+PauzeControl is actively being developed. The current build includes the Android control center, authenticated Mac controls, system telemetry, adaptive H.264 live-screen streaming and power-aware capture behavior. Further work includes polishing the macOS background service/auto-start experience and continued testing across different Mac configurations.
 
 ## 📜 License
 
