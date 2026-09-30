@@ -25,6 +25,7 @@ import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Locale;
 
 public final class ScreenActivity extends Activity
         implements ScreenStreamClient.Listener,
