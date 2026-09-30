@@ -160,6 +160,7 @@
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:text="AUTO"
+            android:background="@drawable/card_status"
             android:textColor="#FFFFFF"
             android:textSize="9sp"
             android:textStyle="bold" />
