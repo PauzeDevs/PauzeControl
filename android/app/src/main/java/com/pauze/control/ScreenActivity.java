@@ -3,6 +3,7 @@
 package com.pauze.control;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.pm.ActivityInfo;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
@@ -19,6 +20,8 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -49,6 +52,32 @@ public final class ScreenActivity extends Activity
     private int streamWidth;
     private int streamHeight;
     private boolean aspectApplied;
+    private int decoderWidth;
+    private int decoderHeight;
+
+    private String selectedQuality = "auto";
+    private int selectedFPS = 0;
+
+    private static final String[] QUALITY_LABELS = {
+            "Auto • Power Aware",
+            "1080p • 60 FPS",
+            "1080p • 30 FPS",
+            "720p • 60 FPS",
+            "720p • 30 FPS",
+            "480p • 30 FPS",
+            "360p • 30 FPS",
+            "240p • 30 FPS",
+            "144p • 30 FPS"
+    };
+
+    private static final String[] QUALITY_VALUES = {
+            "auto", "1080p", "1080p", "720p", "720p",
+            "480p", "360p", "240p", "144p"
+    };
+
+    private static final int[] QUALITY_FPS = {
+            0, 60, 30, 60, 30, 30, 30, 30, 30
+    };
 
     private int frameCount;
     private long fpsWindowStart;
@@ -87,11 +116,13 @@ public final class ScreenActivity extends Activity
         Button reconnectButton = findViewById(R.id.reconnectButton);
         Button reconnectBottomButton = findViewById(R.id.reconnectBottomButton);
         Button fullscreenButton = findViewById(R.id.fullscreenButton);
+        Button qualityButton = findViewById(R.id.qualityButton);
 
         closeButton.setOnClickListener(view -> finish());
         reconnectButton.setOnClickListener(view -> reconnect());
         reconnectBottomButton.setOnClickListener(view -> reconnect());
         fullscreenButton.setOnClickListener(view -> toggleFullscreen());
+        qualityButton.setOnClickListener(view -> showQualityPicker());
 
         // Tapping the video behaves like a modern video player: controls
         // appear briefly, then fade away so the Mac screen gets the focus.
@@ -202,8 +233,8 @@ public final class ScreenActivity extends Activity
     @Override
     public void onConnected() {
         runOnUiThread(() -> {
-            liveStatus.setText("● LIVE  •  H.264  •  720P MAX / 30 FPS");
-            streamInfo.setText("MacBook Air  •  View only  •  H.264");
+            liveStatus.setText("● LIVE  •  H.264");
+            streamInfo.setText("MacBook Air  •  View only  •  " + qualitySummary());
             centerControls.setVisibility(View.GONE);
             scheduleControlsHide();
         });
@@ -224,6 +255,16 @@ public final class ScreenActivity extends Activity
         }
 
         try {
+            // Quality changes restart the Mac encoder. Recreate MediaCodec
+            // only after the next keyframe arrives at the new dimensions.
+            if (decoder != null &&
+                    (decoderWidth != width || decoderHeight != height)) {
+                if (!keyFrame) {
+                    return;
+                }
+                releaseDecoder();
+            }
+
             if (decoder == null) {
                 if (!keyFrame) {
                     return;
@@ -251,6 +292,8 @@ public final class ScreenActivity extends Activity
 
                 decoder.configure(format, surface, null, 0);
                 decoder.start();
+                decoderWidth = width;
+                decoderHeight = height;
             }
 
             MediaCodec activeDecoder = decoder;
@@ -447,6 +490,105 @@ public final class ScreenActivity extends Activity
         });
     }
 
+    private void showQualityPicker() {
+        int checked = findSelectedQualityIndex();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Quality")
+                .setSingleChoiceItems(
+                        QUALITY_LABELS,
+                        checked,
+                        (dialog, which) -> {
+                            dialog.dismiss();
+                            requestQuality(
+                                    QUALITY_VALUES[which],
+                                    QUALITY_FPS[which]
+                            );
+                        }
+                )
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private int findSelectedQualityIndex() {
+        for (int index = 0; index < QUALITY_VALUES.length; index++) {
+            if (QUALITY_VALUES[index].equals(selectedQuality) &&
+                    QUALITY_FPS[index] == selectedFPS) {
+                return index;
+            }
+        }
+        return 0;
+    }
+
+    private String qualitySummary() {
+        if ("auto".equals(selectedQuality)) {
+            return "AUTO • Power aware";
+        }
+        return selectedQuality.toUpperCase(Locale.US) +
+                (selectedFPS > 0 ? " • " + selectedFPS + " FPS" : "");
+    }
+
+    private void requestQuality(String quality, int fps) {
+        if (host == null || token == null || host.isEmpty() || token.isEmpty()) {
+            return;
+        }
+
+        runOnUiThread(() -> {
+            liveStatus.setText("● SWITCHING QUALITY");
+            streamInfo.setText(
+                    "Applying " + quality.toUpperCase(Locale.US) +
+                            ("auto".equals(quality)
+                                    ? " • AUTO"
+                                    : " • " + fps + " FPS") +
+                            "…"
+            );
+        });
+
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("quality", quality);
+
+                if (!"auto".equals(quality)) {
+                    body.put("fps", fps);
+                }
+
+                ApiClient.Result result = ApiClient.post(
+                        host,
+                        token,
+                        "/v1/screen/quality",
+                        body.toString()
+                );
+
+                if (result.code < 200 || result.code >= 300) {
+                    String message = "Mac rejected the selected quality.";
+                    try {
+                        JSONObject error = new JSONObject(result.body);
+                        message = error.optString("error", message);
+                    } catch (Exception ignored) {
+                    }
+                    throw new IllegalStateException(message);
+                }
+
+                selectedQuality = quality;
+                selectedFPS = fps;
+
+                runOnUiThread(() -> {
+                    Button qualityButton = findViewById(R.id.qualityButton);
+                    qualityButton.setText(
+                            "auto".equals(quality)
+                                    ? "AUTO"
+                                    : quality.toUpperCase(Locale.US)
+                    );
+                    liveStatus.setText("● RECONNECTING • H.264");
+                    streamInfo.setText("MacBook Air • View only • " + qualitySummary());
+                });
+            } catch (Exception error) {
+                showErrorState("● QUALITY ERROR");
+            }
+        }, "PauzeControl-Quality").start();
+    }
+
     private void toggleControls() {
         setControlsVisible(!controlsVisible, false);
 
@@ -500,6 +642,8 @@ public final class ScreenActivity extends Activity
     private void releaseDecoder() {
         MediaCodec activeDecoder = decoder;
         decoder = null;
+        decoderWidth = 0;
+        decoderHeight = 0;
 
         if (activeDecoder == null) {
             return;
