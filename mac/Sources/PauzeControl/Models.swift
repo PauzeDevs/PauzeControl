@@ -8,9 +8,10 @@ struct StatusResponse: Codable {
     let restricted: Bool
     let inputBlockingEnabled: Bool
     let serverPort: Int
+    let system: SystemSnapshot
 
     enum CodingKeys: String, CodingKey {
-        case ok, device, restricted
+        case ok, device, restricted, system
         case inputBlockingEnabled = "input_blocking_enabled"
         case serverPort = "server_port"
     }
