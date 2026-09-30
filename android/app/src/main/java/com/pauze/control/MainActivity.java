@@ -41,6 +41,10 @@ public final class MainActivity extends Activity {
     private ExecutorService executor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    private static final int MUTED = Color.rgb(115, 121, 136);
+    private static final int WHITE = Color.WHITE;
+    private static final int ACCENT = Color.rgb(229, 9, 20);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -164,10 +168,22 @@ public final class MainActivity extends Activity {
     }
 
     private void setActiveNav(TextView selected) {
-        navDashboard.setTextColor(Color.rgb(115, 121, 136));
-        navActivity.setTextColor(Color.rgb(115, 121, 136));
-        navSettings.setTextColor(Color.rgb(115, 121, 136));
-        selected.setTextColor(Color.WHITE);
+        navDashboard.setTextColor(MUTED);
+        navActivity.setTextColor(MUTED);
+        navSettings.setTextColor(MUTED);
+        selected.setTextColor(WHITE);
+
+        selected.animate()
+                .scaleX(1.08f)
+                .scaleY(1.08f)
+                .setDuration(120)
+                .withEndAction(() -> selected.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(180)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .start())
+                .start();
     }
 
     private void animateEntrance() {
