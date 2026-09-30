@@ -18,7 +18,7 @@ PauzeControl is a two-part system built around a private connection between an A
   - 🪫 **Battery <30%:** up to **1280×720 / 20 FPS**.
   - 🪫 **Battery <15%:** up to **1280×720 / 15 FPS** saver mode.
 - Preserves the Mac display's aspect ratio instead of stretching the image.
-- Dedicated fullscreen viewer with live stream information.
+- Dedicated fullscreen viewer with YouTube-style controls and a live **Quality** selector.
 - View-only streaming — the Android viewer does not directly control the Mac screen.
 
 The stream is only started while there is an active viewer. When nobody is watching, the capture and encoder stop completely to avoid unnecessary CPU/GPU, memory and battery use.
@@ -72,7 +72,9 @@ The Android app uses a dark, cinematic control-center design with:
 - Live Screen entry point
 - Security information
 - Recent activity
-- Animated UI interactions
+- Animated UI interactions and repeatable scroll-reveal transitions
+- Slide-style Mac restriction control with ON/OFF behavior
+- Monochrome custom-symbol UI accents instead of platform emoji icons
 - Scrollable layouts for smaller displays
 
 ### 🌐 Private Networking
