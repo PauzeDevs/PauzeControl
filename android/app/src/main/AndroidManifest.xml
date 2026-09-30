@@ -12,6 +12,10 @@
         android:usesCleartextTraffic="true">
 
         <activity
+            android:name=".ScreenActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
 
