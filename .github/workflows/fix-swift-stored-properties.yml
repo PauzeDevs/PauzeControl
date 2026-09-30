@@ -1,0 +1,36 @@
+name: Fix Swift stored properties
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[swift-fix]') }}
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix ScreenStreamer initialization
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('mac/Sources/PauzeControl/ScreenStreamer.swift')
+          text = path.read_text()
+          text = text.replace('private var activeFPS = Self.maxFPS', 'private var activeFPS = ScreenStreamer.maxFPS')
+          text = text.replace('private var activeBitrate = Self.targetAverageBitrate', 'private var activeBitrate = ScreenStreamer.targetAverageBitrate')
+          path.write_text(text)
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mac/Sources/PauzeControl/ScreenStreamer.swift
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Swift stored property initialization [swift-fix]"
+          git push
