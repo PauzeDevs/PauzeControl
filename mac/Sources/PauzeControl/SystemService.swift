@@ -33,6 +33,8 @@ struct SystemSnapshot: Codable {
 struct ScreenPowerProfile {
     let fps: Int
     let bitrate: Int
+    let maxWidth: Int
+    let maxHeight: Int
     let name: String
 }
 
@@ -40,37 +42,45 @@ enum SystemService {
     static func streamingProfile() -> ScreenPowerProfile {
         let current = battery()
 
-        // Screen capture is the expensive part of the remote viewer. Keep
-        // the idle agent cheap, and automatically reduce capture/encoding
-        // cost while the Mac is running from battery power.
+        // Keep capture efficient on battery while allowing full quality on AC.
+        // Capture only runs while a viewer is subscribed, so idle Macs pay no
+        // continuous screen-encoding cost.
         guard current.charging == false else {
             return ScreenPowerProfile(
-                fps: 30,
-                bitrate: 4_000_000,
-                name: "AC • 30 FPS"
+                fps: 60,
+                bitrate: 8_000_000,
+                maxWidth: 1920,
+                maxHeight: 1080,
+                name: "AC • 1080p • 60 FPS"
             )
         }
 
-        if let percent = current.percent, percent <= 15 {
+        if let percent = current.percent, percent < 15 {
             return ScreenPowerProfile(
-                fps: 10,
-                bitrate: 1_250_000,
-                name: "Battery • 10 FPS • Saver"
+                fps: 15,
+                bitrate: 2_000_000,
+                maxWidth: 1280,
+                maxHeight: 720,
+                name: "Battery • 720p • 15 FPS • Saver"
             )
         }
 
-        if let percent = current.percent, percent <= 30 {
+        if let percent = current.percent, percent < 30 {
             return ScreenPowerProfile(
-                fps: 12,
-                bitrate: 1_500_000,
-                name: "Battery • 12 FPS"
+                fps: 20,
+                bitrate: 2_750_000,
+                maxWidth: 1280,
+                maxHeight: 720,
+                name: "Battery • 720p • 20 FPS"
             )
         }
 
         return ScreenPowerProfile(
-            fps: 15,
-            bitrate: 2_000_000,
-            name: "Battery • 15 FPS"
+            fps: 30,
+            bitrate: 4_000_000,
+            maxWidth: 1280,
+            maxHeight: 720,
+            name: "Battery • 720p • 30 FPS"
         )
     }
 
