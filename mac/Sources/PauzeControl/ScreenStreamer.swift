@@ -26,7 +26,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private let queue = DispatchQueue(
         label: "com.pauze.control.screen",
-        qos: .userInteractive
+        qos: .userInitiated
     )
 
     private let ciContext = CIContext()
@@ -50,6 +50,10 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private var retryWorkItem: DispatchWorkItem?
     private var captureAttempt = 0
+
+    private var activeFPS = Self.maxFPS
+    private var activeBitrate = Self.targetAverageBitrate
+    private var activeProfileName = "AC • 30 FPS"
 
     private override init() {
         super.init()
@@ -240,6 +244,16 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         createResizePoolIfNeeded()
 
+        let powerProfile = SystemService.streamingProfile()
+        activeFPS = powerProfile.fps
+        activeBitrate = powerProfile.bitrate
+        activeProfileName = powerProfile.name
+
+        print(
+            "[PauzeControl] Streaming profile: \(activeProfileName) " +
+            "• \(activeFPS) FPS • \(activeBitrate / 1_000_000) Mbps"
+        )
+
         let filter =
             SCContentFilter(
                 display: display,
@@ -258,7 +272,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         configuration.minimumFrameInterval =
             CMTime(
                 value: 1,
-                timescale: CMTimeScale(Self.maxFPS)
+                timescale: CMTimeScale(activeFPS)
             )
 
         configuration.queueDepth = 3
@@ -310,10 +324,11 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
                     print(
                         "[PauzeControl] Screen capture started. " +
-                        "Display (display.displayID): " +
-                        "(sourceWidth)x(sourceHeight) -> " +
-                        "(self.outputWidth)x(self.outputHeight) @ " +
-                        "(Self.maxFPS) FPS H.264."
+                        "Display \(display.displayID): " +
+                        "\(sourceWidth)x\(sourceHeight) -> " +
+                        "\(self.outputWidth)x\(self.outputHeight) @ " +
+                        "\(self.activeFPS) FPS H.264 (" +
+                        "\(self.activeProfileName))."
                     )
                 }
             }
@@ -509,6 +524,9 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         outputWidth = 0
         outputHeight = 0
         resizePool = nil
+        activeFPS = Self.maxFPS
+        activeBitrate = Self.targetAverageBitrate
+        activeProfileName = "AC • 30 FPS"
     }
 
     private func invalidateEncoder() {
@@ -620,12 +638,12 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         set(
             kVTCompressionPropertyKey_ExpectedFrameRate,
-            NSNumber(value: Self.maxFPS)
+            NSNumber(value: activeFPS)
         )
 
         set(
             kVTCompressionPropertyKey_MaxKeyFrameInterval,
-            NSNumber(value: Self.maxFPS * 2)
+            NSNumber(value: activeFPS * 2)
         )
 
         set(
@@ -637,7 +655,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             kVTCompressionPropertyKey_AverageBitRate,
             NSNumber(
                 value:
-                    Self.targetAverageBitrate
+                    activeBitrate
             )
         )
 
@@ -687,7 +705,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         if lastFrameTime != 0,
            now - lastFrameTime <
-               (1.0 / Double(Self.maxFPS)) {
+               (1.0 / Double(activeFPS)) {
             return
         }
 
