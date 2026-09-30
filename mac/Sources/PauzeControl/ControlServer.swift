@@ -246,8 +246,10 @@ final class ControlServer {
                     ok: true,
                     device: Host.current().localizedName ?? "Mac",
                     restricted: manager.restricted,
-                    inputBlockingEnabled: manager.inputBlockingEnabled,
-                    serverPort: Int(port)
+                    inputBlockingEnabled:
+                        manager.inputBlockingEnabled,
+                    serverPort: Int(port),
+                    system: SystemService.snapshot()
                 )
             )
 
@@ -263,6 +265,87 @@ final class ControlServer {
                 body: manager.allow()
             )
 
+        case ("POST", "/v1/lock"):
+            return executeSystemCommand(
+                name: "lock"
+            ) {
+                try SystemService.perform("lock")
+            }
+
+        case ("POST", "/v1/sleep"):
+            return executeSystemCommand(
+                name: "sleep"
+            ) {
+                try SystemService.perform("sleep")
+            }
+
+        case ("POST", "/v1/restart"):
+            return executeSystemCommand(
+                name: "restart"
+            ) {
+                try SystemService.perform("restart")
+            }
+
+        case ("POST", "/v1/shutdown"):
+            return executeSystemCommand(
+                name: "shutdown"
+            ) {
+                try SystemService.perform("shutdown")
+            }
+
+        case ("POST", "/v1/mute"):
+            return executeSystemCommand(
+                name: "mute"
+            ) {
+                try SystemService.perform("mute")
+            }
+
+        case ("POST", "/v1/unmute"):
+            return executeSystemCommand(
+                name: "unmute"
+            ) {
+                try SystemService.perform("unmute")
+            }
+
+        case ("POST", "/v1/volume"):
+            guard
+                let bodyData =
+                    request.body.data(using: .utf8),
+                let object =
+                    try? JSONSerialization.jsonObject(
+                        with: bodyData
+                    ) as? [String: Any],
+                let number =
+                    object["volume"] as? NSNumber
+            else {
+                return HTTPResponse.json(
+                    status: 400,
+                    body: ErrorResponse(
+                        ok: false,
+                        error:
+                            "Volume must be a number from 0 to 100."
+                    )
+                )
+            }
+
+            let volume =
+                max(
+                    0,
+                    min(
+                        100,
+                        Int(number.doubleValue.rounded())
+                    )
+                )
+
+            return executeSystemCommand(
+                name: "volume"
+            ) {
+                try SystemService.perform(
+                    "volume",
+                    value: volume
+                )
+            }
+
         default:
             return HTTPResponse.json(
                 status: 404,
@@ -273,6 +356,35 @@ final class ControlServer {
             )
         }
     }
+
+    private func executeSystemCommand(
+        name: String,
+        operation: () throws -> Void
+    ) -> Data {
+        do {
+            try operation()
+
+            return HTTPResponse.json(
+                status: 200,
+                body: CommandResponse(
+                    ok: true,
+                    command: name,
+                    restricted: manager.restricted,
+                    inputBlockingEnabled:
+                        manager.inputBlockingEnabled
+                )
+            )
+        } catch {
+            return HTTPResponse.json(
+                status: 500,
+                body: ErrorResponse(
+                    ok: false,
+                    error: error.localizedDescription
+                )
+            )
+        }
+    }
+
     private func authenticate(_ request: HTTPRequest) -> Bool {
         guard
             let timestampString =
@@ -660,8 +772,10 @@ private enum HTTPResponse {
 
         switch status {
         case 200: reason = "OK"
+        case 400: reason = "Bad Request"
         case 401: reason = "Unauthorized"
         case 404: reason = "Not Found"
+        case 500: reason = "Internal Server Error"
         default: reason = "Error"
         }
 
