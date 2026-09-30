@@ -79,6 +79,12 @@ public final class SlideActionView extends FrameLayout {
         labelView.setTypeface(
                 android.graphics.Typeface.DEFAULT_BOLD
         );
+        labelView.setPadding(
+                dp(46),
+                0,
+                dp(10),
+                0
+        );
 
         LayoutParams labelParams =
                 new LayoutParams(
