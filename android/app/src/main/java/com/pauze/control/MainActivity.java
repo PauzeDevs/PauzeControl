@@ -66,56 +66,100 @@ public final class MainActivity extends Activity {
         executor = Executors.newSingleThreadExecutor();
 
         animateEntrance();
+        setupRevealAnimations();
         setupNavigation();
         loadSavedConnection();
 
         findViewById(R.id.saveButton)
-                .setOnClickListener(view -> saveConnection());
+                .setOnClickListener(view -> animatePressAndRun(view, this::saveConnection));
 
         restrictButton.setOnClickListener(
-                view -> animatePressAndRun(
-                        restrictButton,
-                        () -> sendCommand("/v1/restrict")
-                )
+                view -> animatePressAndRun(restrictButton, () -> sendCommand("/v1/restrict"))
         );
 
         allowButton.setOnClickListener(
-                view -> animatePressAndRun(
-                        allowButton,
-                        () -> sendCommand("/v1/allow")
-                )
+                view -> animatePressAndRun(allowButton, () -> sendCommand("/v1/allow"))
         );
 
         findViewById(R.id.statusButton)
-                .setOnClickListener(view -> checkStatus());
+                .setOnClickListener(view -> animatePressAndRun(view, this::checkStatus));
 
-        statusCard.setOnClickListener(view -> checkStatus());
+        statusCard.setOnClickListener(view -> animateCard(statusCard, this::checkStatus));
 
         findViewById(R.id.screenCard).setOnClickListener(
-                view -> openScreenViewer()
+                view -> animateCard(view, this::openScreenViewer)
         );
+    }
+
+    // Scroll reveal: sections glide into place as they enter the viewport.
+    private void setupRevealAnimations() {
+        View[] revealViews = {
+                statusCard,
+                findViewById(R.id.restrictButton),
+                allowButton,
+                findViewById(R.id.statusButton),
+                findViewById(R.id.screenCard),
+                findViewById(R.id.securityAnchor),
+                findViewById(R.id.activityAnchor),
+                activityCard,
+                findViewById(R.id.settingsAnchor),
+                hostInput,
+                tokenInput,
+                findViewById(R.id.saveButton)
+        };
+
+        for (View view : revealViews) {
+            view.setAlpha(0f);
+            view.setTranslationY(22f);
+            view.setTag(Boolean.FALSE);
+        }
+
+        rootScroll.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            for (View view : revealViews) {
+                revealIfVisible(view);
+            }
+        });
+
+        rootScroll.post(() -> {
+            for (View view : revealViews) {
+                revealIfVisible(view);
+            }
+        });
+    }
+
+    private void revealIfVisible(View view) {
+        if (Boolean.TRUE.equals(view.getTag()) || !view.isShown()) {
+            return;
+        }
+
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int top = location[1];
+        int bottom = top + view.getHeight();
+
+        if (bottom < 70 || top > screenHeight - 40) {
+            return;
+        }
+
+        view.setTag(Boolean.TRUE);
+        view.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(420)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
     }
 
     private void setupNavigation() {
-        navDashboard.setOnClickListener(
-                view -> scrollTo(statusCard, navDashboard)
-        );
-
-        navActivity.setOnClickListener(
-                view -> scrollTo(activityCard, navActivity)
-        );
-
-        navSettings.setOnClickListener(
-                view -> scrollTo(hostInput, navSettings)
-        );
+        navDashboard.setOnClickListener(view -> scrollTo(statusCard, navDashboard));
+        navActivity.setOnClickListener(view -> scrollTo(activityCard, navActivity));
+        navSettings.setOnClickListener(view -> scrollTo(hostInput, navSettings));
     }
 
     private void scrollTo(View target, TextView selected) {
-        rootScroll.post(() -> rootScroll.smoothScrollTo(
-                0,
-                Math.max(0, target.getTop() - 20)
-        ));
-
+        rootScroll.post(() -> rootScroll.smoothScrollTo(0, Math.max(0, target.getTop() - 20)));
         setActiveNav(selected);
     }
 
@@ -142,13 +186,30 @@ public final class MainActivity extends Activity {
 
     private void animatePressAndRun(View target, Runnable action) {
         target.animate()
-                .scaleX(0.97f)
-                .scaleY(0.97f)
-                .setDuration(70)
+                .scaleX(0.96f)
+                .scaleY(0.96f)
+                .alpha(0.88f)
+                .setDuration(75)
                 .withEndAction(() -> target.animate()
                         .scaleX(1f)
                         .scaleY(1f)
-                        .setDuration(120)
+                        .alpha(1f)
+                        .setDuration(170)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .withEndAction(action)
+                        .start())
+                .start();
+    }
+
+    private void animateCard(View target, Runnable action) {
+        target.animate()
+                .scaleX(0.985f)
+                .scaleY(0.985f)
+                .setDuration(80)
+                .withEndAction(() -> target.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(180)
                         .withEndAction(action)
                         .start())
                 .start();
@@ -157,34 +218,19 @@ public final class MainActivity extends Activity {
     private void openScreenViewer() {
         executor.execute(() -> {
             try {
-                String host =
-                        hostInput.getText()
-                                .toString()
-                                .trim();
+                String host = hostInput.getText().toString().trim();
+                String token = secureStore.getToken();
 
-                String token =
-                        secureStore.getToken();
-
-                if (host.isEmpty() ||
-                        token.isEmpty()) {
-                    throw new IllegalStateException(
-                            "Save the Mac connection first."
-                    );
+                if (host.isEmpty() || token.isEmpty()) {
+                    throw new IllegalStateException("Save the Mac connection first.");
                 }
 
                 mainHandler.post(() -> {
-                    android.content.Intent intent =
-                            new android.content.Intent(
-                                    this,
-                                    ScreenActivity.class
-                            );
-
+                    android.content.Intent intent = new android.content.Intent(this, ScreenActivity.class);
                     intent.putExtra("host", host);
                     intent.putExtra("token", token);
-
                     startActivity(intent);
                 });
-
             } catch (Exception error) {
                 showError(error.getMessage());
             }
@@ -192,15 +238,12 @@ public final class MainActivity extends Activity {
     }
 
     private void loadSavedConnection() {
-        String host = getPreferences(MODE_PRIVATE)
-                .getString("host", "");
-
+        String host = getPreferences(MODE_PRIVATE).getString("host", "");
         hostInput.setText(host);
 
         executor.execute(() -> {
             try {
                 String token = secureStore.getToken();
-
                 mainHandler.post(() -> tokenInput.setText(token));
 
                 if (!host.isEmpty() && !token.isEmpty()) {
@@ -221,10 +264,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        getPreferences(MODE_PRIVATE)
-                .edit()
-                .putString("host", host)
-                .apply();
+        getPreferences(MODE_PRIVATE).edit().putString("host", host).apply();
 
         executor.execute(() -> {
             try {
@@ -254,8 +294,7 @@ public final class MainActivity extends Activity {
                     throw new IllegalStateException("Mac returned HTTP " + result.code);
                 }
 
-                boolean restricted = ApiClient.restricted(result.body);
-                updateState(restricted);
+                updateState(ApiClient.restricted(result.body));
             } catch (Exception error) {
                 showError(error.getMessage());
             }
@@ -334,15 +373,12 @@ public final class MainActivity extends Activity {
     }
 
     private void showError(String message) {
-        final String safe = message == null || message.trim().isEmpty()
-                ? "Unknown error."
-                : message;
+        final String safe = message == null || message.trim().isEmpty() ? "Unknown error." : message;
 
         mainHandler.post(() -> {
             statusText.setText("🔴 " + safe);
             connectionPill.setText("● OFFLINE");
             connectionPill.setTextColor(Color.rgb(170, 174, 185));
-
             Toast.makeText(this, safe, Toast.LENGTH_SHORT).show();
         });
     }
