@@ -120,15 +120,13 @@ public final class SlideActionView extends FrameLayout {
 
     public void setText(String text) {
         currentText = text == null ? "" : text;
-        if (labelView != null) {
-            labelView.setText(toggleControl
-                    ? toggleLabel(currentText)
-                    : currentText);
-        }
 
         if (toggleControl) {
             checked = textIndicatesOn(currentText);
+            labelView.setText(toggleLabel(currentText));
             updateSwitchVisuals();
+        } else {
+            labelView.setText(normalizeActionLabel(currentText));
         }
     }
 
@@ -179,10 +177,21 @@ public final class SlideActionView extends FrameLayout {
         }
 
         if (!currentText.isEmpty()) {
-            labelView.setText(toggleControl
-                    ? toggleLabel(currentText)
-                    : currentText);
+            labelView.setText(
+                    toggleControl
+                            ? toggleLabel(currentText)
+                            : normalizeActionLabel(currentText)
+            );
         }
+    }
+
+    private String normalizeActionLabel(String text) {
+        return text
+                .replaceFirst(
+                        "(?i)^\\s*SLIDE\\s+TO\\s+",
+                        ""
+                )
+                .trim();
     }
 
     private boolean textIndicatesOn(String text) {
@@ -203,9 +212,7 @@ public final class SlideActionView extends FrameLayout {
 
     private String toggleLabel(String text) {
         if (getId() == R.id.restrictionCard) {
-            return checked
-                    ? "MAC RESTRICTION"
-                    : "MAC RESTRICTION";
+            return "MAC RESTRICTION";
         }
 
         if (getId() == R.id.muteButton) {
