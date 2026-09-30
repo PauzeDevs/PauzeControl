@@ -156,11 +156,10 @@
             android:id="@+id/qualityButton"
             android:layout_width="56dp"
             android:layout_height="44dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/card_status"
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:text="AUTO"
-            android:background="@drawable/card_status"
             android:textColor="#FFFFFF"
             android:textSize="9sp"
             android:textStyle="bold" />
