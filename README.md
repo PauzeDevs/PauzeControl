@@ -19,6 +19,12 @@ The Android controller can send authenticated commands to:
 
 The restriction is intentionally separate from the macOS login screen. Knowing the Mac account password does not act as the PauzeControl release credential.
 
+### Mac controls and system dashboard
+
+PauzeControl can also request macOS lock, sleep, restart and shutdown actions, plus output mute/unmute and a 0–100 volume level. Restart and shutdown are confirmed in the Android UI.
+
+The authenticated status endpoint includes live CPU, memory, disk, battery, uptime, macOS version and audio telemetry for the dashboard. The Android app refreshes this view periodically while open.
+
 ### Live screen
 
 PauzeControl includes a view-only live Mac screen path:
