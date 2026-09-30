@@ -9,7 +9,7 @@ import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.FrameLayout;
+import android.widget.FrameLayout;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
