@@ -5,6 +5,7 @@ import CoreImage
 import CoreMedia
 import CoreVideo
 import ScreenCaptureKit
+import QuartzCore
 
 final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     static let shared = ScreenStreamer()
