@@ -54,6 +54,8 @@ The Mac status endpoint can provide:
 
 The Android controller refreshes the dashboard while it is open.
 
+Screen streaming is power-aware: on AC power it can use up to 30 FPS / 4 Mbps. On battery it automatically reduces capture rate and bitrate, with a stronger saver profile at low battery levels. The stream also stops completely when there are no active viewers, avoiding continuous screen-capture/encoding while idle.
+
 ### 📱 Android Control Center
 
 The Android app uses a dark, cinematic control-center design with:
