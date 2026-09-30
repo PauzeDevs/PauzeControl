@@ -30,7 +30,50 @@ struct SystemSnapshot: Codable {
     }
 }
 
+struct ScreenPowerProfile {
+    let fps: Int
+    let bitrate: Int
+    let name: String
+}
+
 enum SystemService {
+    static func streamingProfile() -> ScreenPowerProfile {
+        let current = battery()
+
+        // Screen capture is the expensive part of the remote viewer. Keep
+        // the idle agent cheap, and automatically reduce capture/encoding
+        // cost while the Mac is running from battery power.
+        guard current.charging == false else {
+            return ScreenPowerProfile(
+                fps: 30,
+                bitrate: 4_000_000,
+                name: "AC • 30 FPS"
+            )
+        }
+
+        if let percent = current.percent, percent <= 15 {
+            return ScreenPowerProfile(
+                fps: 10,
+                bitrate: 1_250_000,
+                name: "Battery • 10 FPS • Saver"
+            )
+        }
+
+        if let percent = current.percent, percent <= 30 {
+            return ScreenPowerProfile(
+                fps: 12,
+                bitrate: 1_500_000,
+                name: "Battery • 12 FPS"
+            )
+        }
+
+        return ScreenPowerProfile(
+            fps: 15,
+            bitrate: 2_000_000,
+            name: "Battery • 15 FPS"
+        )
+    }
+
     static func snapshot() -> SystemSnapshot {
         let memory = memory()
         let disk = disk()
