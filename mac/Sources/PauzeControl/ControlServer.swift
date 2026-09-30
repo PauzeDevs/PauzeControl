@@ -164,12 +164,18 @@ final class ControlServer {
             return
         }
 
+        // Authenticated private H.264 stream using the PZV1 packet wrapper.
         let header = [
             "HTTP/1.1 200 OK",
-            "Content-Type: multipart/x-mixed-replace; boundary=pauze-frame",
+            "Content-Type: video/H264",
             "Cache-Control: no-cache, no-store, must-revalidate",
             "Pragma: no-cache",
             "Connection: close",
+            "X-Pauze-Video-Codec: H264",
+            "X-Pauze-Frame-Format: PZV1",
+            "X-Pauze-Max-Width: \(ScreenStreamer.maxWidth)",
+            "X-Pauze-Max-Height: \(ScreenStreamer.maxHeight)",
+            "X-Pauze-Max-FPS: \(ScreenStreamer.maxFPS)",
             "",
             ""
         ].joined(separator: "\r\n")
@@ -361,17 +367,22 @@ final class ControlServer {
 }
 
 private final class ScreenClient {
+    private static let headerSize = 24
+    private static let magic = Data([0x50, 0x5A, 0x56, 0x31])
+
     private let connection: NWConnection
     private let stream: ScreenStreamer
     private let onClose: () -> Void
+
     private let queue = DispatchQueue(
         label: "com.pauze.control.screen.client",
         qos: .userInteractive
     )
 
     private var subscriberID: UUID?
+    private var pending: EncodedScreenFrame?
     private var sending = false
-    private var pending: (Data, Int, Int)?
+    private var closed = false
 
     init(
         connection: NWConnection,
@@ -384,21 +395,28 @@ private final class ScreenClient {
     }
 
     func start() {
-        let id = stream.subscribe { [weak self] jpeg, width, height in
-            self?.enqueue(
-                jpeg: jpeg,
-                width: width,
-                height: height
-            )
+        let id = stream.subscribe { [weak self] frame in
+            self?.enqueue(frame: frame)
         }
 
         queue.async {
+            guard !self.closed else {
+                self.stream.unsubscribe(id)
+                return
+            }
+
             self.subscriberID = id
         }
     }
 
     func close() {
         queue.async {
+            guard !self.closed else {
+                return
+            }
+
+            self.closed = true
+
             if let id = self.subscriberID {
                 self.stream.unsubscribe(id)
                 self.subscriberID = nil
@@ -412,16 +430,21 @@ private final class ScreenClient {
     }
 
     private func enqueue(
-        jpeg: Data,
-        width: Int,
-        height: Int
+        frame: EncodedScreenFrame
     ) {
         queue.async {
-            guard self.subscriberID != nil else {
+            guard !self.closed else {
                 return
             }
 
-            self.pending = (jpeg, width, height)
+            // Keep the latest useful frame; do not evict a pending keyframe.
+            if let pending = self.pending,
+               pending.keyFrame,
+               !frame.keyFrame {
+                return
+            }
+
+            self.pending = frame
 
             guard !self.sending else {
                 return
@@ -432,6 +455,10 @@ private final class ScreenClient {
     }
 
     private func sendNext() {
+        guard !closed else {
+            return
+        }
+
         guard let frame = pending else {
             sending = false
             return
@@ -440,19 +467,8 @@ private final class ScreenClient {
         pending = nil
         sending = true
 
-        var packet = Data(
-            "--pauze-frame\r\n" +
-            "Content-Type: image/jpeg\r\n" +
-            "Content-Length: \(frame.0.count)\r\n" +
-            "X-Pauze-Width: \(frame.1)\r\n" +
-            "X-Pauze-Height: \(frame.2)\r\n\r\n"
-        )
-
-        packet.append(frame.0)
-        packet.append(Data("\r\n".utf8))
-
         connection.send(
-            content: packet,
+            content: makePacket(frame),
             completion: .contentProcessed { [weak self] error in
                 guard let self else { return }
 
@@ -460,7 +476,16 @@ private final class ScreenClient {
                     self.sending = false
 
                     if error != nil {
-                        self.close()
+                        self.closed = true
+
+                        if let id = self.subscriberID {
+                            self.stream.unsubscribe(id)
+                            self.subscriberID = nil
+                        }
+
+                        self.pending = nil
+                        self.connection.cancel()
+                        self.onClose()
                         return
                     }
 
@@ -468,6 +493,73 @@ private final class ScreenClient {
                 }
             }
         )
+    }
+
+    private func makePacket(
+        _ frame: EncodedScreenFrame
+    ) -> Data {
+        // 24-byte header:
+        // magic[4], version[1], flags[1], headerLength[2],
+        // payloadLength[4], ptsUs[8], width[2], height[2].
+        var packet = Self.magic
+
+        packet.append(0x01)
+        packet.append(frame.keyFrame ? 0x01 : 0x00)
+
+        appendUInt16(
+            UInt16(Self.headerSize),
+            to: &packet
+        )
+
+        appendUInt32(
+            UInt32(frame.data.count),
+            to: &packet
+        )
+
+        appendUInt64(
+            UInt64(bitPattern: frame.ptsMicroseconds),
+            to: &packet
+        )
+
+        appendUInt16(
+            UInt16(max(0, min(frame.width, ScreenStreamer.maxWidth))),
+            to: &packet
+        )
+
+        appendUInt16(
+            UInt16(max(0, min(frame.height, ScreenStreamer.maxHeight))),
+            to: &packet
+        )
+
+        packet.append(frame.data)
+        return packet
+    }
+}
+
+private func appendUInt16(
+    _ value: UInt16,
+    to data: inout Data
+) {
+    data.append(UInt8(value >> 8))
+    data.append(UInt8(value & 0xFF))
+}
+
+private func appendUInt32(
+    _ value: UInt32,
+    to data: inout Data
+) {
+    data.append(UInt8((value >> 24) & 0xFF))
+    data.append(UInt8((value >> 16) & 0xFF))
+    data.append(UInt8((value >> 8) & 0xFF))
+    data.append(UInt8(value & 0xFF))
+}
+
+private func appendUInt64(
+    _ value: UInt64,
+    to data: inout Data
+) {
+    for shift in stride(from: 56, through: 0, by: -8) {
+        data.append(UInt8((value >> UInt64(shift)) & 0xFF))
     }
 }
 

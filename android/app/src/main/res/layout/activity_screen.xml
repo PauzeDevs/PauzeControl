@@ -5,13 +5,12 @@
     android:layout_height="match_parent"
     android:background="#050609">
 
-    <ImageView
-        android:id="@+id/screenImage"
+    <SurfaceView
+        android:id="@+id/screenSurface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:adjustViewBounds="true"
         android:contentDescription="Live Mac screen"
-        android:scaleType="fitCenter" />
+        android:keepScreenOn="true" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -45,7 +44,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="CONNECTING…"
+                android:text="CONNECTING • H.264"
                 android:textColor="#69F0AE"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -55,7 +54,7 @@
             android:id="@+id/resolutionText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="VIEW ONLY"
+            android:text="VIEW ONLY • H.264"
             android:textColor="#A1A6B2"
             android:textSize="10sp"
             android:textStyle="bold" />

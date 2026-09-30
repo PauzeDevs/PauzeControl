@@ -109,7 +109,7 @@ public final class ApiClient {
         connection.setUseCaches(false);
         connection.setRequestProperty(
                 "Accept",
-                "multipart/x-mixed-replace"
+                "video/H264"
         );
         connection.setRequestProperty(
                 "X-Pauze-Timestamp",

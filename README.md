@@ -26,7 +26,7 @@ PauzeControl includes a view-only live Mac screen path:
 - Maximum 1280×720 output.
 - Maximum 30 FPS.
 - Screen capture is performed natively on macOS with ScreenCaptureKit.
-- Android displays the stream in a dedicated fullscreen viewer.
+- Android decodes and displays the stream in a dedicated fullscreen viewer.
 - The stream uses the same authenticated control secret to authorize the initial connection.
 - Tailscale is intended as the private network transport.
 

@@ -2,20 +2,29 @@
 
 package com.pauze.control;
 
-import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.util.ArrayList;
-import java.util.List;
 
 public final class ScreenStreamClient {
 
     public interface Listener {
-        void onFrame(byte[] jpeg, int width, int height);
+        void onFrame(
+                byte[] accessUnit,
+                int width,
+                int height,
+                boolean keyFrame,
+                long ptsMicroseconds
+        );
+
         void onConnected();
         void onError(String message);
         void onClosed();
     }
+
+    private static final int HEADER_SIZE = 24;
+    private static final int MAX_ACCESS_UNIT_BYTES = 5 * 1024 * 1024;
 
     private final String host;
     private final String token;
@@ -37,7 +46,7 @@ public final class ScreenStreamClient {
     public void start() {
         new Thread(
                 this::run,
-                "PauzeControl-ScreenStream"
+                "PauzeControl-H264"
         ).start();
     }
 
@@ -53,10 +62,7 @@ public final class ScreenStreamClient {
 
     private void run() {
         try {
-            connection = ApiClient.openScreen(
-                    host,
-                    token
-            );
+            connection = ApiClient.openScreen(host, token);
 
             int code = connection.getResponseCode();
 
@@ -69,16 +75,18 @@ public final class ScreenStreamClient {
             running = true;
             listener.onConnected();
 
-            readMultipart(
+            readStream(
                     connection.getInputStream()
             );
 
         } catch (Exception error) {
             if (running) {
+                String message = error.getMessage();
+
                 listener.onError(
-                        error.getMessage() == null
-                                ? "Screen stream failed."
-                                : error.getMessage()
+                        message == null || message.isEmpty()
+                                ? "H.264 stream failed."
+                                : message
                 );
             }
         } finally {
@@ -92,92 +100,110 @@ public final class ScreenStreamClient {
         }
     }
 
-    private void readMultipart(
+    private void readStream(
             InputStream input
     ) throws Exception {
+        DataInputStream stream =
+                new DataInputStream(input);
 
-        ByteArrayOutputStream frame =
-                new ByteArrayOutputStream(256 * 1024);
-
-        boolean collecting = false;
-        boolean previousWasFF = false;
-
-        byte[] chunk = new byte[32 * 1024];
+        byte[] magic = new byte[4];
 
         while (running) {
-            int count = input.read(chunk);
+            readFully(stream, magic, 0, 4);
 
-            if (count == -1) {
-                break;
+            if (magic[0] != 0x50 ||
+                    magic[1] != 0x5A ||
+                    magic[2] != 0x56 ||
+                    magic[3] != 0x31) {
+                throw new IllegalStateException(
+                        "Invalid H.264 stream header."
+                );
             }
 
-            for (int i = 0; i < count; i++) {
-                int value = chunk[i] & 0xFF;
+            int version =
+                    stream.readUnsignedByte();
+            int flags =
+                    stream.readUnsignedByte();
+            int headerLength =
+                    stream.readUnsignedShort();
+            int payloadLength =
+                    stream.readInt();
+            long ptsMicroseconds =
+                    stream.readLong();
+            int width =
+                    stream.readUnsignedShort();
+            int height =
+                    stream.readUnsignedShort();
 
-                if (!collecting) {
-                    if (previousWasFF && value == 0xD8) {
-                        collecting = true;
-                        frame.reset();
-                        frame.write(0xFF);
-                        frame.write(0xD8);
-                    }
-
-                    previousWasFF = value == 0xFF;
-                    continue;
-                }
-
-                frame.write(value);
-
-                int size = frame.size();
-
-                if (size > 2_500_000) {
-                    collecting = false;
-                    frame.reset();
-                    previousWasFF = false;
-                    continue;
-                }
-
-                if (previousWasFF && value == 0xD9) {
-                    byte[] jpeg = frame.toByteArray();
-                    emitFrame(jpeg);
-
-                    collecting = false;
-                    frame.reset();
-                    previousWasFF = false;
-                    continue;
-                }
-
-                previousWasFF = value == 0xFF;
+            if (version != 1 ||
+                    headerLength != HEADER_SIZE) {
+                throw new IllegalStateException(
+                        "Unsupported H.264 packet version."
+                );
             }
+
+            if (payloadLength <= 0 ||
+                    payloadLength > MAX_ACCESS_UNIT_BYTES) {
+                throw new IllegalStateException(
+                        "H.264 access unit is too large."
+                );
+            }
+
+            if (width <= 0 ||
+                    width > 1280 ||
+                    height <= 0 ||
+                    height > 720) {
+                throw new IllegalStateException(
+                        "Invalid screen dimensions."
+                );
+            }
+
+            byte[] accessUnit =
+                    new byte[payloadLength];
+
+            readFully(
+                    stream,
+                    accessUnit,
+                    0,
+                    accessUnit.length
+            );
+
+            listener.onFrame(
+                    accessUnit,
+                    width,
+                    height,
+                    (flags & 0x01) != 0,
+                    Math.max(0L, ptsMicroseconds)
+            );
         }
     }
 
-    private void emitFrame(
-            byte[] jpeg
-    ) {
-        android.graphics.BitmapFactory.Options options =
-                new android.graphics.BitmapFactory.Options();
+    private static void readFully(
+            DataInputStream input,
+            byte[] buffer,
+            int offset,
+            int length
+    ) throws Exception {
+        int remaining = length;
 
-        options.inJustDecodeBounds = true;
+        while (remaining > 0) {
+            int count = input.read(
+                    buffer,
+                    offset + length - remaining,
+                    remaining
+            );
 
-        android.graphics.BitmapFactory.decodeByteArray(
-                jpeg,
-                0,
-                jpeg.length,
-                options
-        );
+            if (count < 0) {
+                throw new EOFException(
+                        "H.264 stream closed."
+                );
+            }
 
-        int width = options.outWidth;
-        int height = options.outHeight;
+            if (count == 0) {
+                continue;
+            }
 
-        if (width <= 0 || height <= 0) {
-            return;
+            remaining -= count;
         }
-
-        listener.onFrame(
-                jpeg,
-                width,
-                height
-        );
     }
 }
