@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#07080B" />
+    <gradient
+        android:type="linear"
+        android:angle="270"
+        android:startColor="#130609"
+        android:centerColor="#08090C"
+        android:endColor="#050609" />
 </shape>
