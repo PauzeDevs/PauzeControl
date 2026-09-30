@@ -153,6 +153,18 @@
             android:textSize="22sp" />
 
         <Button
+            android:id="@+id/qualityButton"
+            android:layout_width="56dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="AUTO"
+            android:textColor="#FFFFFF"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <Button
             android:id="@+id/fullscreenButton"
             android:layout_width="44dp"
             android:layout_height="44dp"
