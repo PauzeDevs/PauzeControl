@@ -7,15 +7,15 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.view.Gravity;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
 /**
- * Compact slide-to-action control used for remote Mac commands.
- * The action fires only after the thumb is deliberately dragged across
- * the completion threshold, which helps prevent accidental remote commands.
+ * Shared remote-control surface.
+ *
+ * Toggle-style controls (restriction and mute) use an Apple-inspired
+ * ON/OFF switch. One-shot commands use a normal pressable button.
  */
 public final class SlideActionView extends FrameLayout {
 
@@ -25,16 +25,18 @@ public final class SlideActionView extends FrameLayout {
 
     private static final int TRACK = Color.rgb(18, 26, 42);
     private static final int BORDER = Color.rgb(45, 60, 84);
-    private static final int THUMB = Color.rgb(124, 92, 255);
     private static final int TEXT = Color.WHITE;
+    private static final int SWITCH_OFF = Color.rgb(68, 76, 91);
+    private static final int SWITCH_ON = Color.rgb(52, 199, 89);
 
     private final TextView labelView;
-    private final TextView thumbView;
+    private final View switchTrack;
+    private final View switchThumb;
 
     private OnSlideCompleteListener listener;
-    private float downX;
-    private float startTranslationX;
-    private boolean dragging;
+    private boolean toggleControl;
+    private boolean checked;
+    private String currentText = "";
 
     public SlideActionView(Context context) {
         this(context, null);
@@ -54,36 +56,29 @@ public final class SlideActionView extends FrameLayout {
     ) {
         super(context, attrs, defStyleAttr);
 
-        setWillNotDraw(false);
         setClickable(true);
         setFocusable(true);
-        setClipChildren(true);
+        setClipChildren(false);
         setPadding(
+                dp(14),
                 dp(6),
-                dp(6),
-                dp(6),
+                dp(12),
                 dp(6)
         );
 
         GradientDrawable background =
                 new GradientDrawable();
         background.setColor(TRACK);
-        background.setCornerRadius(dp(20));
+        background.setCornerRadius(dp(16));
         background.setStroke(dp(1), BORDER);
         setBackground(background);
 
         labelView = new TextView(context);
-        labelView.setGravity(Gravity.CENTER);
+        labelView.setGravity(Gravity.CENTER_VERTICAL);
         labelView.setTextColor(TEXT);
-        labelView.setTextSize(12);
+        labelView.setTextSize(13);
         labelView.setTypeface(
                 android.graphics.Typeface.DEFAULT_BOLD
-        );
-        labelView.setPadding(
-                dp(46),
-                0,
-                dp(10),
-                0
         );
 
         LayoutParams labelParams =
@@ -93,142 +88,176 @@ public final class SlideActionView extends FrameLayout {
                 );
         addView(labelView, labelParams);
 
-        thumbView = new TextView(context);
-        thumbView.setText("→");
-        thumbView.setGravity(Gravity.CENTER);
-        thumbView.setTextColor(Color.WHITE);
-        thumbView.setTextSize(20);
-        thumbView.setTypeface(
-                android.graphics.Typeface.DEFAULT_BOLD
-        );
+        switchTrack = new View(context);
+        switchTrack.setVisibility(INVISIBLE);
+        LayoutParams trackParams =
+                new LayoutParams(
+                        dp(50),
+                        dp(30)
+                );
+        trackParams.gravity = Gravity.CENTER_VERTICAL | Gravity.END;
+        addView(switchTrack, trackParams);
 
-        GradientDrawable thumbBackground =
-                new GradientDrawable();
-        thumbBackground.setColor(THUMB);
-        thumbBackground.setCornerRadius(dp(16));
-        thumbView.setBackground(thumbBackground);
-
+        switchThumb = new View(context);
+        switchThumb.setVisibility(INVISIBLE);
         LayoutParams thumbParams =
                 new LayoutParams(
-                        dp(44),
-                        dp(44)
+                        dp(24),
+                        dp(24)
                 );
-        thumbParams.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
-        addView(thumbView, thumbParams);
+        thumbParams.gravity = Gravity.CENTER_VERTICAL | Gravity.END;
+        thumbParams.rightMargin = dp(3);
+        addView(switchThumb, thumbParams);
 
-        thumbView.setOnTouchListener(
-                (view, event) -> handleThumbTouch(event)
-        );
+        post(this::configureMode);
+    }
+
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+        configureMode();
     }
 
     public void setText(String text) {
-        labelView.setText(text);
+        currentText = text == null ? "" : text;
+        if (labelView != null) {
+            labelView.setText(toggleControl
+                    ? toggleLabel(currentText)
+                    : currentText);
+        }
+
+        if (toggleControl) {
+            checked = textIndicatesOn(currentText);
+            updateSwitchVisuals();
+        }
     }
 
     public void setOnSlideCompleteListener(
             OnSlideCompleteListener listener
     ) {
         this.listener = listener;
+        setOnClickListener(v -> {
+            if (toggleControl) {
+                checked = !checked;
+                updateSwitchVisuals();
+            }
+
+            animatePress();
+
+            if (this.listener != null) {
+                this.listener.onSlideComplete(this);
+            }
+        });
     }
 
-    private boolean handleThumbTouch(MotionEvent event) {
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                downX = event.getRawX();
-                startTranslationX = thumbView.getTranslationX();
-                dragging = true;
-                return true;
+    private void configureMode() {
+        int id = getId();
+        toggleControl =
+                id == R.id.restrictionCard ||
+                id == R.id.muteButton;
 
-            case MotionEvent.ACTION_MOVE:
-                if (!dragging) {
-                    return false;
-                }
+        if (toggleControl) {
+            labelView.setPadding(
+                    0,
+                    0,
+                    dp(64),
+                    0
+            );
+            switchTrack.setVisibility(VISIBLE);
+            switchThumb.setVisibility(VISIBLE);
+            setContentDescription(
+                    id == R.id.restrictionCard
+                            ? "Mac restriction switch"
+                            : "Mac mute switch"
+            );
+            checked = textIndicatesOn(currentText);
+            updateSwitchVisuals();
+        } else {
+            labelView.setPadding(0, 0, 0, 0);
+            switchTrack.setVisibility(INVISIBLE);
+            switchThumb.setVisibility(INVISIBLE);
+        }
 
-                float delta =
-                        event.getRawX() - downX;
-
-                float maxTravel =
-                        Math.max(
-                                0,
-                                getWidth()
-                                        - getPaddingLeft()
-                                        - getPaddingRight()
-                                        - thumbView.getWidth()
-                                        - dp(2)
-                        );
-
-                float next =
-                        clamp(
-                                startTranslationX + delta,
-                                0,
-                                maxTravel
-                        );
-
-                thumbView.setTranslationX(next);
-                return true;
-
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                if (!dragging) {
-                    return false;
-                }
-
-                dragging = false;
-
-                float max =
-                        Math.max(
-                                1,
-                                getWidth()
-                                        - getPaddingLeft()
-                                        - getPaddingRight()
-                                        - thumbView.getWidth()
-                                        - dp(2)
-                        );
-
-                float progress =
-                        thumbView.getTranslationX() / max;
-
-                if (progress >= 0.78f &&
-                        event.getActionMasked() == MotionEvent.ACTION_UP) {
-                    OnSlideCompleteListener callback = listener;
-
-                    thumbView.animate()
-                            .translationX(max)
-                            .setDuration(90)
-                            .withEndAction(
-                                    () -> {
-                                        if (callback != null) {
-                                            callback.onSlideComplete(this);
-                                        }
-
-                                        resetThumb();
-                                    }
-                            )
-                            .start();
-                } else {
-                    resetThumb();
-                }
-
-                return true;
-
-            default:
-                return false;
+        if (!currentText.isEmpty()) {
+            labelView.setText(toggleControl
+                    ? toggleLabel(currentText)
+                    : currentText);
         }
     }
 
-    private void resetThumb() {
-        thumbView.animate()
-                .translationX(0)
-                .setDuration(220)
-                .start();
+    private boolean textIndicatesOn(String text) {
+        String value = text == null
+                ? ""
+                : text.toUpperCase();
+
+        if (getId() == R.id.restrictionCard) {
+            return value.contains("ALLOW");
+        }
+
+        if (getId() == R.id.muteButton) {
+            return value.contains("UNMUTE");
+        }
+
+        return false;
     }
 
-    private static float clamp(
-            float value,
-            float min,
-            float max
-    ) {
-        return Math.max(min, Math.min(max, value));
+    private String toggleLabel(String text) {
+        if (getId() == R.id.restrictionCard) {
+            return checked
+                    ? "MAC RESTRICTION"
+                    : "MAC RESTRICTION";
+        }
+
+        if (getId() == R.id.muteButton) {
+            return "MUTE AUDIO";
+        }
+
+        return text;
+    }
+
+    private void updateSwitchVisuals() {
+        if (!toggleControl) {
+            return;
+        }
+
+        GradientDrawable track =
+                new GradientDrawable();
+        track.setColor(
+                checked
+                        ? SWITCH_ON
+                        : SWITCH_OFF
+        );
+        track.setCornerRadius(dp(16));
+        switchTrack.setBackground(track);
+
+        GradientDrawable thumb =
+                new GradientDrawable();
+        thumb.setColor(Color.WHITE);
+        thumb.setShape(GradientDrawable.OVAL);
+        switchThumb.setBackground(thumb);
+
+        switchThumb.setTranslationX(
+                checked
+                        ? -dp(23)
+                        : 0
+        );
+    }
+
+    private void animatePress() {
+        animate()
+                .scaleX(0.985f)
+                .scaleY(0.985f)
+                .alpha(0.9f)
+                .setDuration(70)
+                .withEndAction(
+                        () -> animate()
+                                .scaleX(1f)
+                                .scaleY(1f)
+                                .alpha(1f)
+                                .setDuration(160)
+                                .start()
+                )
+                .start();
     }
 
     private int dp(int value) {
