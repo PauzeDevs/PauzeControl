@@ -18,6 +18,9 @@ final class ControlServer {
     private var seenNonces: [String: Date] = [:]
     private let nonceLock = NSLock()
 
+    private var screenClients: [UUID: ScreenClient] = [:]
+    private let screenClientLock = NSLock()
+
     init(
         port: UInt16 = 47777,
         token: String,
@@ -171,10 +174,19 @@ final class ControlServer {
             ""
         ].joined(separator: "\r\n")
 
+        let clientID = UUID()
+
         let client = ScreenClient(
             connection: connection,
-            stream: ScreenStreamer.shared
+            stream: ScreenStreamer.shared,
+            onClose: { [weak self] in
+                self?.removeScreenClient(clientID)
+            }
         )
+
+        screenClientLock.lock()
+        screenClients[clientID] = client
+        screenClientLock.unlock()
 
         connection.stateUpdateHandler = { [weak client] state in
             switch state {
@@ -201,6 +213,12 @@ final class ControlServer {
                 client.start()
             }
         )
+    }
+
+    private func removeScreenClient(_ id: UUID) {
+        screenClientLock.lock()
+        screenClients.removeValue(forKey: id)
+        screenClientLock.unlock()
     }
 
     private func handle(_ request: HTTPRequest) -> Data {
@@ -345,6 +363,7 @@ final class ControlServer {
 private final class ScreenClient {
     private let connection: NWConnection
     private let stream: ScreenStreamer
+    private let onClose: () -> Void
     private let queue = DispatchQueue(
         label: "com.pauze.control.screen.client",
         qos: .userInteractive
@@ -356,10 +375,12 @@ private final class ScreenClient {
 
     init(
         connection: NWConnection,
-        stream: ScreenStreamer
+        stream: ScreenStreamer,
+        onClose: @escaping () -> Void
     ) {
         self.connection = connection
         self.stream = stream
+        self.onClose = onClose
     }
 
     func start() {
@@ -386,6 +407,7 @@ private final class ScreenClient {
             self.pending = nil
             self.sending = false
             self.connection.cancel()
+            self.onClose()
         }
     }
 
