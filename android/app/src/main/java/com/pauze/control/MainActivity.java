@@ -6,6 +6,8 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -124,7 +126,6 @@ public final class MainActivity extends Activity {
         macosValue = findViewById(R.id.macosValue);
 
         volumeValue = findViewById(R.id.volumeValue);
-        muteButton = findViewById(R.id.muteButton);
         volumeSeek = findViewById(R.id.volumeSeek);
 
         navDashboard = findViewById(R.id.navDashboard);
