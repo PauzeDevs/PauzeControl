@@ -12,10 +12,11 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 /**
- * Shared remote-control surface.
+ * Shared action-row control.
  *
- * Toggle-style controls (restriction and mute) use an Apple-inspired
- * ON/OFF switch. One-shot commands use a normal pressable button.
+ * All remote actions use one consistent Apple-inspired toggle surface.
+ * Persistent controls keep their ON/OFF state; one-shot actions briefly
+ * animate ON, run the command, and return to OFF automatically.
  */
 public final class SlideActionView extends FrameLayout {
 
@@ -23,10 +24,11 @@ public final class SlideActionView extends FrameLayout {
         void onSlideComplete(SlideActionView view);
     }
 
-    private static final int TRACK = Color.rgb(18, 26, 42);
-    private static final int BORDER = Color.rgb(45, 60, 84);
+    private static final int SURFACE = Color.rgb(16, 22, 34);
+    private static final int BORDER = Color.rgb(38, 49, 69);
     private static final int TEXT = Color.WHITE;
-    private static final int SWITCH_OFF = Color.rgb(68, 76, 91);
+    private static final int SUBTLE = Color.rgb(148, 157, 174);
+    private static final int SWITCH_OFF = Color.rgb(62, 68, 79);
     private static final int SWITCH_ON = Color.rgb(52, 199, 89);
 
     private final TextView labelView;
@@ -35,6 +37,7 @@ public final class SlideActionView extends FrameLayout {
 
     private OnSlideCompleteListener listener;
     private boolean toggleControl;
+    private boolean persistentControl;
     private boolean checked;
     private String currentText = "";
 
@@ -59,55 +62,54 @@ public final class SlideActionView extends FrameLayout {
         setClickable(true);
         setFocusable(true);
         setClipChildren(false);
+        setMinimumHeight(dp(60));
         setPadding(
-                dp(14),
-                dp(6),
+                dp(16),
+                dp(7),
                 dp(12),
-                dp(6)
+                dp(7)
         );
 
-        GradientDrawable background =
-                new GradientDrawable();
-        background.setColor(TRACK);
-        background.setCornerRadius(dp(16));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(SURFACE);
+        background.setCornerRadius(dp(17));
         background.setStroke(dp(1), BORDER);
         setBackground(background);
 
         labelView = new TextView(context);
         labelView.setGravity(Gravity.CENTER_VERTICAL);
         labelView.setTextColor(TEXT);
-        labelView.setTextSize(13);
+        labelView.setTextSize(14);
         labelView.setTypeface(
                 android.graphics.Typeface.DEFAULT_BOLD
         );
+        labelView.setSingleLine(true);
 
-        LayoutParams labelParams =
-                new LayoutParams(
-                        LayoutParams.MATCH_PARENT,
-                        LayoutParams.MATCH_PARENT
-                );
+        LayoutParams labelParams = new LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT
+        );
+        labelParams.rightMargin = dp(70);
         addView(labelView, labelParams);
 
         switchTrack = new View(context);
-        switchTrack.setVisibility(INVISIBLE);
-        LayoutParams trackParams =
-                new LayoutParams(
-                        dp(50),
-                        dp(30)
-                );
+        LayoutParams trackParams = new LayoutParams(
+                dp(54),
+                dp(32)
+        );
         trackParams.gravity = Gravity.CENTER_VERTICAL | Gravity.END;
         addView(switchTrack, trackParams);
 
         switchThumb = new View(context);
-        switchThumb.setVisibility(INVISIBLE);
-        LayoutParams thumbParams =
-                new LayoutParams(
-                        dp(24),
-                        dp(24)
-                );
+        LayoutParams thumbParams = new LayoutParams(
+                dp(26),
+                dp(26)
+        );
         thumbParams.gravity = Gravity.CENTER_VERTICAL | Gravity.END;
         thumbParams.rightMargin = dp(3);
         addView(switchThumb, thumbParams);
+
+        switchThumb.setElevation(dp(2));
 
         post(this::configureMode);
     }
@@ -120,106 +122,112 @@ public final class SlideActionView extends FrameLayout {
 
     public void setText(String text) {
         currentText = text == null ? "" : text;
+        labelView.setText(currentText);
+        configureMode();
+    }
 
-        if (toggleControl) {
-            checked = textIndicatesOn(currentText);
-            labelView.setText(toggleLabel(currentText));
-            updateSwitchVisuals();
-        } else {
-            labelView.setText(normalizeActionLabel(currentText));
-        }
+    public void setChecked(boolean value) {
+        checked = value;
+        updateSwitchVisuals();
+    }
+
+    public boolean isChecked() {
+        return checked;
     }
 
     public void setOnSlideCompleteListener(
             OnSlideCompleteListener listener
     ) {
         this.listener = listener;
-        setOnClickListener(v -> {
-            if (toggleControl) {
+
+        setOnClickListener(view -> {
+            if (!toggleControl) {
+                animatePress(
+                        () -> {
+                            if (this.listener != null) {
+                                this.listener.onSlideComplete(this);
+                            }
+                        }
+                );
+                return;
+            }
+
+            if (persistentControl) {
                 checked = !checked;
                 updateSwitchVisuals();
+
+                animatePress(
+                        () -> {
+                            if (this.listener != null) {
+                                this.listener.onSlideComplete(this);
+                            }
+                        }
+                );
+                return;
             }
 
-            animatePress();
+            checked = true;
+            updateSwitchVisuals();
 
-            if (this.listener != null) {
-                this.listener.onSlideComplete(this);
-            }
+            animatePress(
+                    () -> {
+                        if (this.listener != null) {
+                            this.listener.onSlideComplete(this);
+                        }
+
+                        postDelayed(
+                                () -> {
+                                    checked = false;
+                                    updateSwitchVisuals();
+                                },
+                                260L
+                        );
+                    }
+            );
         });
     }
 
     private void configureMode() {
         int id = getId();
+
         toggleControl =
+                id == R.id.saveButton ||
+                id == R.id.statusButton ||
+                id == R.id.restrictionCard ||
+                id == R.id.lockButton ||
+                id == R.id.sleepButton ||
+                id == R.id.restartButton ||
+                id == R.id.shutdownButton ||
+                id == R.id.muteButton;
+
+        persistentControl =
                 id == R.id.restrictionCard ||
                 id == R.id.muteButton;
 
+        labelView.setText(
+                currentText
+        );
+
+        switchTrack.setVisibility(
+                toggleControl
+                        ? VISIBLE
+                        : INVISIBLE
+        );
+
+        switchThumb.setVisibility(
+                toggleControl
+                        ? VISIBLE
+                        : INVISIBLE
+        );
+
         if (toggleControl) {
-            labelView.setPadding(
-                    0,
-                    0,
-                    dp(64),
-                    0
-            );
-            switchTrack.setVisibility(VISIBLE);
-            switchThumb.setVisibility(VISIBLE);
             setContentDescription(
-                    id == R.id.restrictionCard
-                            ? "Mac restriction switch"
-                            : "Mac mute switch"
+                    persistentControl
+                            ? "Toggle " + currentText
+                            : "Activate " + currentText
             );
-            checked = textIndicatesOn(currentText);
             updateSwitchVisuals();
-        } else {
-            labelView.setPadding(0, 0, 0, 0);
-            switchTrack.setVisibility(INVISIBLE);
-            switchThumb.setVisibility(INVISIBLE);
         }
-
-        if (!currentText.isEmpty()) {
-            labelView.setText(
-                    toggleControl
-                            ? toggleLabel(currentText)
-                            : normalizeActionLabel(currentText)
-            );
-        }
-    }
-
-    private String normalizeActionLabel(String text) {
-        return text
-                .replaceFirst(
-                        "(?i)^\\s*SLIDE\\s+TO\\s+",
-                        ""
-                )
-                .trim();
-    }
-
-    private boolean textIndicatesOn(String text) {
-        String value = text == null
-                ? ""
-                : text.toUpperCase();
-
-        if (getId() == R.id.restrictionCard) {
-            return value.contains("ALLOW");
-        }
-
-        if (getId() == R.id.muteButton) {
-            return value.contains("UNMUTE");
-        }
-
-        return false;
-    }
-
-    private String toggleLabel(String text) {
-        if (getId() == R.id.restrictionCard) {
-            return "MAC RESTRICTION";
-        }
-
-        if (getId() == R.id.muteButton) {
-            return "MUTE AUDIO";
-        }
-
-        return text;
     }
 
     private void updateSwitchVisuals() {
@@ -227,18 +235,16 @@ public final class SlideActionView extends FrameLayout {
             return;
         }
 
-        GradientDrawable track =
-                new GradientDrawable();
+        GradientDrawable track = new GradientDrawable();
         track.setColor(
                 checked
                         ? SWITCH_ON
                         : SWITCH_OFF
         );
-        track.setCornerRadius(dp(16));
+        track.setCornerRadius(dp(18));
         switchTrack.setBackground(track);
 
-        GradientDrawable thumb =
-                new GradientDrawable();
+        GradientDrawable thumb = new GradientDrawable();
         thumb.setColor(Color.WHITE);
         thumb.setShape(GradientDrawable.OVAL);
         switchThumb.setBackground(thumb);
@@ -250,11 +256,11 @@ public final class SlideActionView extends FrameLayout {
         );
     }
 
-    private void animatePress() {
+    private void animatePress(Runnable endAction) {
         animate()
                 .scaleX(0.985f)
                 .scaleY(0.985f)
-                .alpha(0.9f)
+                .alpha(0.92f)
                 .setDuration(70)
                 .withEndAction(
                         () -> animate()
@@ -262,6 +268,7 @@ public final class SlideActionView extends FrameLayout {
                                 .scaleY(1f)
                                 .alpha(1f)
                                 .setDuration(160)
+                                .withEndAction(endAction)
                                 .start()
                 )
                 .start();
