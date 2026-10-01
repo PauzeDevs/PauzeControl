@@ -7,9 +7,10 @@
 
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#090A0D</item>
-        <item name="android:navigationBarColor">#090A0D</item>
-        <item name="android:colorAccent">#E50914</item>
+        <item name="android:statusBarColor">#070B14</item>
+        <item name="android:navigationBarColor">#070B14</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">#6D7CFF</item>
 
     </style>
 </resources>
