@@ -5,7 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_screen"
+    android:clipToPadding="false"
     android:fillViewport="true"
+    android:fitsSystemWindows="true"
     android:overScrollMode="never">
 
     <LinearLayout
@@ -13,10 +15,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingTop="24dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="42dp">
+        android:paddingStart="18dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="36dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -34,18 +36,19 @@
                     android:layout_height="wrap_content"
                     android:text="PAUZE"
                     android:textColor="#FFFFFF"
-                    android:textSize="32sp"
+                    android:textSize="30sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.10" />
+                    android:letterSpacing="0.11" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="CONTROL CENTER"
-                    android:textColor="#6F7685"
+                    android:textColor="#717A8C"
                     android:textSize="10sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.25" />
+                    android:letterSpacing="0.24" />
             </LinearLayout>
 
             <TextView
@@ -53,24 +56,24 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/card_status"
-                android:paddingStart="14dp"
+                android:paddingStart="12dp"
                 android:paddingTop="8dp"
-                android:paddingEnd="14dp"
+                android:paddingEnd="12dp"
                 android:paddingBottom="8dp"
                 android:text="● OFFLINE"
                 android:textColor="#9AA0AD"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/navBar"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="24dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="18dp"
             android:background="@drawable/card_status"
             android:gravity="center_vertical"
-            android:padding="5dp">
+            android:padding="4dp">
 
             <TextView
                 android:id="@+id/navDashboard"
@@ -80,9 +83,9 @@
                 android:gravity="center"
                 android:text="HOME"
                 android:textColor="#FFFFFF"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.05" />
+                android:letterSpacing="0.06" />
 
             <TextView
                 android:id="@+id/navActivity"
@@ -92,9 +95,9 @@
                 android:gravity="center"
                 android:text="ACTIVITY"
                 android:textColor="#737988"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.05" />
+                android:letterSpacing="0.06" />
 
             <TextView
                 android:id="@+id/navSettings"
@@ -104,290 +107,264 @@
                 android:gravity="center"
                 android:text="SETTINGS"
                 android:textColor="#737988"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.05" />
+                android:letterSpacing="0.06" />
         </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
+            android:layout_marginTop="26dp"
             android:text="YOUR MAC"
-            android:textColor="#707887"
-            android:textSize="11sp"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.20" />
+            android:letterSpacing="0.18" />
 
         <LinearLayout
             android:id="@+id/statusCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="18dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/macNameText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical">
+                android:text="Mac"
+                android:textColor="#FFFFFF"
+                android:textSize="23sp"
+                android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/macNameText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="MacBook Air"
-                        android:textColor="#FFFFFF"
-                        android:textSize="25sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/macStateText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="Not connected"
-                        android:textColor="#9298A6"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
-                    android:background="@drawable/button_primary"
-                    android:gravity="center"
-                    android:text="✦"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/macStateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="Not connected"
+                android:textColor="#8E96A6"
+                android:textSize="13sp" />
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginTop="18dp"
-                android:background="#292D36" />
+                android:layout_marginTop="15dp"
+                android:background="#252D3C" />
 
             <TextView
                 android:id="@+id/statusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="12dp"
                 android:text="Waiting for connection…"
                 android:textColor="#C7CBD4"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="SYSTEM OVERVIEW"
-            android:textColor="#747987"
-            android:textSize="11sp"
+            android:layout_marginTop="26dp"
+            android:text="SYSTEM"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.22" />
+            android:letterSpacing="0.18" />
 
         <LinearLayout
             android:id="@+id/systemCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="78dp"
-                android:orientation="horizontal">
+                android:layout_height="72dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginEnd="5dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="CPU"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/cpuValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="18sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="MEMORY"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/memoryValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="78dp"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                android:layout_height="72dp"
+                android:layout_marginTop="10dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginEnd="5dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="DISK"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/diskValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="BATTERY"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/batteryValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="78dp"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                android:layout_height="72dp"
+                android:layout_marginTop="10dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginEnd="5dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="UPTIME"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/uptimeValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
                     android:background="@drawable/card_metric"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="11dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="macOS"
-                        android:textColor="#777C8A"
-                        android:textSize="9sp"
+                        android:textColor="#747E90"
+                        android:textSize="8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/macosValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:text="—"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
@@ -396,44 +373,44 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
+            android:layout_marginTop="26dp"
             android:text="QUICK CONTROL"
             android:textColor="#8D82FF"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.20" />
+            android:letterSpacing="0.18" />
 
         <com.pauze.control.SlideActionView
             android:id="@+id/restrictionCard"
             android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="10dp"
-            android:contentDescription="Slide to change Mac restriction"
-            android:text="SLIDE TO RESTRICT" />
+            android:layout_height="60dp"
+            android:layout_marginTop="9dp"
+            android:contentDescription="Toggle Mac restriction"
+            android:text="MAC RESTRICTION" />
 
         <com.pauze.control.SlideActionView
             android:id="@+id/statusButton"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="10dp"
-            android:contentDescription="Slide to refresh Mac status"
-            android:text="SLIDE TO REFRESH" />
+            android:layout_height="60dp"
+            android:layout_marginTop="8dp"
+            android:contentDescription="Refresh Mac status"
+            android:text="REFRESH STATUS" />
 
         <LinearLayout
             android:id="@+id/screenCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="10dp"
             android:background="@drawable/card_status"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
-            android:minHeight="82dp"
+            android:minHeight="76dp"
             android:orientation="horizontal"
-            android:paddingStart="18dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="14dp">
+            android:paddingStart="17dp"
+            android:paddingTop="13dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="13dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -446,112 +423,94 @@
                     android:layout_height="wrap_content"
                     android:text="LIVE SCREEN"
                     android:textColor="#FFFFFF"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="3dp"
                     android:text="View your Mac remotely • up to 1080p / 60 FPS"
-                    android:textColor="#858B99"
-                    android:textSize="12sp" />
+                    android:textColor="#818A9B"
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <TextView
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/button_primary"
                 android:gravity="center"
                 android:text="›"
                 android:textColor="#FFFFFF"
-                android:textSize="26sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="26dp"
             android:text="POWER &amp; AUDIO"
-            android:textColor="#747987"
-            android:textSize="11sp"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.22" />
+            android:letterSpacing="0.18" />
 
         <LinearLayout
             android:id="@+id/powerCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="10dp">
 
-            <LinearLayout
+            <com.pauze.control.SlideActionView
+                android:id="@+id/lockButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_height="60dp"
+                android:contentDescription="Lock Mac"
+                android:text="LOCK MAC" />
 
-                <com.pauze.control.SlideActionView
-                    android:id="@+id/lockButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="5dp"
-                    android:contentDescription="Slide to lock Mac"
-                    android:text="LOCK" />
-
-                <com.pauze.control.SlideActionView
-                    android:id="@+id/sleepButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:contentDescription="Slide to sleep Mac"
-                    android:text="SLEEP" />
-            </LinearLayout>
-
-            <LinearLayout
+            <com.pauze.control.SlideActionView
+                android:id="@+id/sleepButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                android:layout_height="60dp"
+                android:layout_marginTop="8dp"
+                android:contentDescription="Sleep Mac"
+                android:text="SLEEP MAC" />
 
-                <com.pauze.control.SlideActionView
-                    android:id="@+id/restartButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="5dp"
-                    android:contentDescription="Slide to restart Mac"
-                    android:text="RESTART" />
+            <com.pauze.control.SlideActionView
+                android:id="@+id/restartButton"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="8dp"
+                android:contentDescription="Restart Mac"
+                android:text="RESTART MAC" />
 
-                <com.pauze.control.SlideActionView
-                    android:id="@+id/shutdownButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:contentDescription="Slide to shut down Mac"
-                    android:text="SHUT DOWN" />
-            </LinearLayout>
+            <com.pauze.control.SlideActionView
+                android:id="@+id/shutdownButton"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="8dp"
+                android:contentDescription="Shut down Mac"
+                android:text="SHUT DOWN MAC" />
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginTop="14dp"
-                android:background="#292930" />
+                android:layout_marginTop="12dp"
+                android:background="#252D3C" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="11dp"
                 android:text="OUTPUT VOLUME"
-                android:textColor="#777C8A"
-                android:textSize="9sp"
+                android:textColor="#747E90"
+                android:textSize="8sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.12" />
+                android:letterSpacing="0.10" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -561,73 +520,73 @@
                 <SeekBar
                     android:id="@+id/volumeSeek"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
                     android:max="100"
                     android:progress="50" />
 
                 <TextView
                     android:id="@+id/volumeValue"
-                    android:layout_width="42dp"
+                    android:layout_width="45dp"
                     android:layout_height="wrap_content"
                     android:gravity="end"
                     android:text="—"
                     android:textColor="#FFFFFF"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <com.pauze.control.SlideActionView
                 android:id="@+id/muteButton"
                 android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="4dp"
-                android:contentDescription="Slide to mute or unmute Mac audio"
-                android:text="MUTE" />
+                android:layout_height="60dp"
+                android:layout_marginTop="5dp"
+                android:contentDescription="Toggle Mac audio mute"
+                android:text="MUTE AUDIO" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/securityAnchor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="26dp"
             android:text="SECURITY"
-            android:textColor="#707887"
-            android:textSize="11sp"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.20" />
+            android:letterSpacing="0.18" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:orientation="vertical"
-            android:padding="18dp">
+            android:padding="17dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Remote control protected"
+                android:text="Private remote access"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Your pairing secret stays on the phone. Commands are authenticated before reaching your Mac."
-                android:textColor="#858B99"
-                android:textSize="12sp" />
+                android:layout_marginTop="5dp"
+                android:text="Pairing secrets stay on the phone and commands are authenticated before reaching your Mac."
+                android:textColor="#818A9B"
+                android:textSize="11sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="13dp"
-                android:text="●  PRIVATE CONNECTION"
+                android:layout_marginTop="12dp"
+                android:text="●  PRIVATE • TAILSCALE"
                 android:textColor="#69F0AE"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05" />
         </LinearLayout>
@@ -636,21 +595,21 @@
             android:id="@+id/activityAnchor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="26dp"
             android:text="RECENT ACTIVITY"
-            android:textColor="#707887"
-            android:textSize="11sp"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.20" />
+            android:letterSpacing="0.18" />
 
         <LinearLayout
             android:id="@+id/activityCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:orientation="vertical"
-            android:padding="18dp">
+            android:padding="17dp">
 
             <TextView
                 android:id="@+id/activityTitle"
@@ -658,75 +617,93 @@
                 android:layout_height="wrap_content"
                 android:text="No activity yet"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/activityDetail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="5dp"
                 android:text="Connect your Mac to start recording remote-control events."
-                android:textColor="#858B99"
-                android:textSize="12sp" />
+                android:textColor="#818A9B"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/settingsAnchor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="26dp"
             android:text="CONNECTION"
-            android:textColor="#707887"
-            android:textSize="11sp"
+            android:textColor="#717A8C"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.20" />
+            android:letterSpacing="0.18" />
 
         <EditText
             android:id="@+id/hostInput"
             android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="10dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/card_status"
             android:hint="Mac Tailscale address"
             android:inputType="textUri"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:singleLine="true"
             android:textColor="#FFFFFF"
-            android:textColorHint="#626875" />
+            android:textColorHint="#626B7B" />
 
         <EditText
             android:id="@+id/tokenInput"
             android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="10dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
             android:background="@drawable/card_status"
             android:hint="Pairing secret"
             android:inputType="textPassword"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:singleLine="true"
             android:textColor="#FFFFFF"
-            android:textColorHint="#626875" />
+            android:textColorHint="#626B7B" />
 
         <com.pauze.control.SlideActionView
             android:id="@+id/saveButton"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="10dp"
-            android:contentDescription="Slide to save Mac connection"
-            android:text="SLIDE TO SAVE CONNECTION" />
+            android:layout_height="60dp"
+            android:layout_marginTop="8dp"
+            android:contentDescription="Save Mac connection"
+            android:text="SAVE CONNECTION" />
+
+        <TextView
+            android:id="@+id/githubLink"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:text="GitHub  •  github.com/PauzeDevs/PauzeControl"
+            android:textColor="#7F8CFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
+            android:autoLink="web" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
-            android:text="PAUZE CONTROL  •  PRIVATE REMOTE ACCESS"
-            android:textAlignment="center"
-            android:textColor="#4F5562"
-            android:textSize="10sp"
-            android:letterSpacing="0.12" />
+            android:layout_marginTop="5dp"
+            android:gravity="center"
+            android:text="© 2026 PauzeDevs • PauzeControl"
+            android:textColor="#4F5868"
+            android:textSize="9sp"
+            android:letterSpacing="0.06" />
 
     </LinearLayout>
 </ScrollView>
