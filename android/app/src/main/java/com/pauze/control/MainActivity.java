@@ -135,20 +135,20 @@ public final class MainActivity extends Activity {
     }
 
     private void setupActions() {
-        setupSlideAction(
+        setupToggleAction(
                 R.id.saveButton,
-                "SLIDE TO SAVE CONNECTION",
+                "SAVE CONNECTION",
                 this::saveConnection
         );
 
-        setupSlideAction(
+        setupToggleAction(
                 R.id.statusButton,
-                "SLIDE TO REFRESH",
+                "REFRESH STATUS",
                 () -> refreshStatus(true)
         );
 
         restrictionControl.setText(
-                "SLIDE TO RESTRICT"
+                "MAC RESTRICTION"
         );
         restrictionControl.setOnSlideCompleteListener(
                 view -> sendCommand(
@@ -158,39 +158,41 @@ public final class MainActivity extends Activity {
                 )
         );
 
-        setupSlideAction(
+        setupToggleAction(
                 R.id.lockButton,
-                "SLIDE TO LOCK",
+                "LOCK MAC",
                 () -> sendCommand("/v1/lock")
         );
 
-        setupSlideAction(
+        setupToggleAction(
                 R.id.sleepButton,
-                "SLIDE TO SLEEP",
+                "SLEEP MAC",
                 () -> sendCommand("/v1/sleep")
         );
 
-        setupSlideAction(
+        setupToggleAction(
                 R.id.restartButton,
-                "SLIDE TO RESTART",
+                "RESTART MAC",
                 () -> confirmAction(
                         "Restart Mac?",
-                        "Slide confirmation received. The Mac will restart.",
+                        "The Mac will restart.",
                         "/v1/restart"
                 )
         );
 
-        setupSlideAction(
+        setupToggleAction(
                 R.id.shutdownButton,
-                "SLIDE TO SHUT DOWN",
+                "SHUT DOWN MAC",
                 () -> confirmAction(
                         "Shut down Mac?",
-                        "Slide confirmation received. The Mac will shut down.",
+                        "The Mac will shut down.",
                         "/v1/shutdown"
                 )
         );
 
-        muteButton.setText("SLIDE TO MUTE");
+        muteButton.setText(
+                "MUTE AUDIO"
+        );
         muteButton.setOnSlideCompleteListener(
                 view -> sendCommand(
                         macMuted
@@ -242,9 +244,28 @@ public final class MainActivity extends Activity {
                         () -> refreshStatus(true)
                 )
         );
+
+        TextView githubLink =
+                findViewById(R.id.githubLink);
+
+        githubLink.setOnClickListener(
+                view -> {
+                    try {
+                        startActivity(
+                                new Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse(
+                                                "https://github.com/PauzeDevs/PauzeControl"
+                                        )
+                                )
+                        );
+                    } catch (Exception ignored) {
+                    }
+                }
+        );
     }
 
-    private void setupSlideAction(
+    private void setupToggleAction(
             int viewId,
             String label,
             Runnable action
@@ -644,9 +665,10 @@ public final class MainActivity extends Activity {
                 () -> {
                     macRestricted = restricted;
                     restrictionControl.setText(
+                            "MAC RESTRICTION"
+                    );
+                    restrictionControl.setChecked(
                             restricted
-                                    ? "SLIDE TO ALLOW"
-                                    : "SLIDE TO RESTRICT"
                     );
 
                     if (restricted) {
@@ -823,9 +845,10 @@ public final class MainActivity extends Activity {
                     );
 
                     muteButton.setText(
+                            "MUTE AUDIO"
+                    );
+                    muteButton.setChecked(
                             macMuted
-                                    ? "SLIDE TO UNMUTE"
-                                    : "SLIDE TO MUTE"
                     );
                 }
         );
