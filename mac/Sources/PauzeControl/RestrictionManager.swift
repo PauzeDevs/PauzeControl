@@ -108,20 +108,21 @@ final class RestrictionManager: NSObject {
     private func installEventTapIfNeeded() {
         guard eventTap == nil else { return }
 
-        let mask =
-            (CGEventMask(1) << CGEventType.keyDown.rawValue) |
-            (CGEventMask(1) << CGEventType.keyUp.rawValue) |
-            (CGEventMask(1) << CGEventType.flagsChanged.rawValue) |
-            (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
-            (CGEventMask(1) << CGEventType.leftMouseUp.rawValue) |
-            (CGEventMask(1) << CGEventType.rightMouseDown.rawValue) |
-            (CGEventMask(1) << CGEventType.rightMouseUp.rawValue) |
-            (CGEventMask(1) << CGEventType.otherMouseDown.rawValue) |
-            (CGEventMask(1) << CGEventType.otherMouseUp.rawValue) |
-            (CGEventMask(1) << CGEventType.leftMouseDragged.rawValue) |
-            (CGEventMask(1) << CGEventType.rightMouseDragged.rawValue) |
-            (CGEventMask(1) << CGEventType.otherMouseDragged.rawValue) |
-            (CGEventMask(1) << CGEventType.scrollWheel.rawValue)
+        var mask: CGEventMask = 0
+
+        mask |= CGEventMask(1) << CGEventType.keyDown.rawValue
+        mask |= CGEventMask(1) << CGEventType.keyUp.rawValue
+        mask |= CGEventMask(1) << CGEventType.flagsChanged.rawValue
+        mask |= CGEventMask(1) << CGEventType.leftMouseDown.rawValue
+        mask |= CGEventMask(1) << CGEventType.leftMouseUp.rawValue
+        mask |= CGEventMask(1) << CGEventType.rightMouseDown.rawValue
+        mask |= CGEventMask(1) << CGEventType.rightMouseUp.rawValue
+        mask |= CGEventMask(1) << CGEventType.otherMouseDown.rawValue
+        mask |= CGEventMask(1) << CGEventType.otherMouseUp.rawValue
+        mask |= CGEventMask(1) << CGEventType.leftMouseDragged.rawValue
+        mask |= CGEventMask(1) << CGEventType.rightMouseDragged.rawValue
+        mask |= CGEventMask(1) << CGEventType.otherMouseDragged.rawValue
+        mask |= CGEventMask(1) << CGEventType.scrollWheel.rawValue
 
         let context = UnsafeMutableRawPointer(
             Unmanaged.passUnretained(self).toOpaque()
