@@ -249,10 +249,12 @@ public final class SlideActionView extends FrameLayout {
         thumb.setShape(GradientDrawable.OVAL);
         switchThumb.setBackground(thumb);
 
+        // The thumb is laid out at the right edge by default.
+        // Keep ON at the right (0 translation) and move OFF to the left.
         switchThumb.setTranslationX(
                 checked
-                        ? -dp(23)
-                        : 0
+                        ? 0
+                        : -dp(23)
         );
     }
 
