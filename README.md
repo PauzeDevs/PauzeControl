@@ -126,6 +126,18 @@ gradle assembleDebug
 
 GitHub Actions builds the Android debug APK automatically.
 
+### Signing Android release builds
+
+The tagged/manual Android release workflow requires these GitHub Actions repository secrets before it can publish an installable signed APK:
+
+- `ANDROID_KEYSTORE_BASE64`: base64-encoded release keystore
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password
+- `ANDROID_KEY_ALIAS`: signing key alias
+- `ANDROID_KEY_PASSWORD`: signing key password
+
+Use a stable release keystore and keep its private material outside the repository. The workflow validates the keystore and verifies the resulting APK signature before upload.
+
+
 ## 📁 Project Structure
 
 ```text
