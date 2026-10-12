@@ -51,6 +51,9 @@ public final class ScreenActivity extends Activity
     private boolean controlsVisible = true;
     private boolean qualityConfigured;
     private boolean qualityRequestInFlight;
+    private boolean manualReconnectRequested;
+    private int reconnectAttempts;
+    private static final long MAX_RECONNECT_DELAY_MS = 30_000L;
 
     private int streamWidth;
     private int streamHeight;
@@ -89,6 +92,12 @@ public final class ScreenActivity extends Activity
 
     private final Runnable hideControlsRunnable =
             () -> setControlsVisible(false, true);
+
+    private final Runnable automaticReconnectRunnable = () -> {
+        if (!shuttingDown && surfaceReady && streamClient == null) {
+            startStream();
+        }
+    };
 
     private final MediaCodec.BufferInfo bufferInfo =
             new MediaCodec.BufferInfo();
@@ -197,6 +206,7 @@ public final class ScreenActivity extends Activity
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         surfaceReady = false;
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
         decoderSurface = null;
         aspectApplied = false;
         releaseDecoder();
@@ -234,6 +244,9 @@ public final class ScreenActivity extends Activity
             return;
         }
 
+        reconnectAttempts = 0;
+        manualReconnectRequested = true;
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
         centerControls.setVisibility(View.GONE);
         liveStatus.setText("CONNECTING • H.264");
         resolutionText.setText("VIEW ONLY • H.264");
@@ -249,7 +262,8 @@ public final class ScreenActivity extends Activity
             streamClient = null;
             activeClient.stop();
         } else if (surfaceReady) {
-            screenSurface.postDelayed(this::startStream, 100);
+            manualReconnectRequested = false;
+            screenSurface.postDelayed(automaticReconnectRunnable, 100);
         }
 
         showControlsTemporarily();
@@ -266,7 +280,7 @@ public final class ScreenActivity extends Activity
     }
 
     @Override
-    public void onFrame(
+    public synchronized void onFrame(
             byte[] accessUnit,
             int width,
             int height,
@@ -328,12 +342,20 @@ public final class ScreenActivity extends Activity
                 ByteBuffer input = activeDecoder.getInputBuffer(inputIndex);
 
                 if (input == null) {
+                    // Reset the codec so a dequeued input slot cannot leave
+                    // the decoder in an unrecoverable partially-ready state.
+                    releaseDecoder();
                     return;
                 }
 
                 input.clear();
 
                 if (accessUnit.length > input.remaining()) {
+                    activeDecoder.queueInputBuffer(
+                            inputIndex, 0, 0,
+                            Math.max(0L, ptsMicroseconds), 0
+                    );
+                    releaseDecoder();
                     return;
                 }
 
@@ -499,11 +521,34 @@ public final class ScreenActivity extends Activity
             if (!shuttingDown && surfaceReady &&
                     host != null && token != null &&
                     !host.isEmpty() && !token.isEmpty()) {
-                liveStatus.setText("CONNECTING • H.264");
-                streamInfo.setText("Reconnecting to MacBook Air…");
-                screenSurface.postDelayed(this::startStream, 150);
+                if (manualReconnectRequested) {
+                    manualReconnectRequested = false;
+                    reconnectAttempts = 0;
+                    liveStatus.setText("CONNECTING • H.264");
+                    streamInfo.setText("Reconnecting to MacBook Air…");
+                    screenSurface.removeCallbacks(automaticReconnectRunnable);
+                    screenSurface.postDelayed(automaticReconnectRunnable, 150);
+                } else {
+                    scheduleAutomaticReconnect();
+                }
             }
         });
+    }
+
+    private void scheduleAutomaticReconnect() {
+        if (shuttingDown || !surfaceReady) {
+            return;
+        }
+
+        int attempt = Math.min(reconnectAttempts++, 6);
+        long delay = Math.min(
+                MAX_RECONNECT_DELAY_MS,
+                500L * (1L << attempt)
+        );
+        liveStatus.setText("● RECONNECTING");
+        streamInfo.setText("Retrying in " + (delay / 1000.0) + " seconds…");
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
+        screenSurface.postDelayed(automaticReconnectRunnable, delay);
     }
 
     private void showErrorState(String status) {
@@ -673,7 +718,7 @@ public final class ScreenActivity extends Activity
         }
     }
 
-    private void releaseDecoder() {
+    private synchronized void releaseDecoder() {
         MediaCodec activeDecoder = decoder;
         decoder = null;
         decoderWidth = 0;
@@ -773,6 +818,7 @@ public final class ScreenActivity extends Activity
     protected void onDestroy() {
         shuttingDown = true;
         surfaceReady = false;
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
         uiHandler.removeCallbacksAndMessages(null);
 
         ScreenStreamClient activeClient = streamClient;
