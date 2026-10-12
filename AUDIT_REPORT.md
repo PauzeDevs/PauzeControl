@@ -81,6 +81,12 @@ All 15 findings from the prior audit have been addressed in the current PR branc
 - The Android debug workflow validates the launcher resources as part of its normal build.
 - Focused performance changes remain in place: reusable Android nonce generation/direct HMAC hex encoding, and one combined macOS audio telemetry AppleScript call.
 
+## Additional hardening during remediation
+
+- Replay-nonce entries are now registered only after the HMAC signature is valid, preventing unauthenticated requests from filling the replay cache with arbitrary nonce values.
+- Requests that carry a body without a valid Content-Length are rejected.
+- Periodic Android status polls are now single-flight, preventing slow timeouts from building an unbounded executor queue.
+
 ## Remaining verification
 
 1. Configure the four release-signing secrets before the first tagged/manual release build; this environment cannot create repository secrets or access your private release keystore.
