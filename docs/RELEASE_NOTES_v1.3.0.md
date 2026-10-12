@@ -15,7 +15,7 @@
 - Removed Auto / Power Aware mode and the macOS battery-profile override.
 - Exposed manual targets: 144p, 240p, 360p, 480p, 720p, and 1080p.
 - 720p and 1080p support 30 or 60 FPS; lower targets use 30 FPS.
-- Saved the user selection and apply it on the Mac before opening the stream.
+- Saved the user selection and applied it on the Mac before opening the stream.
 - Retained aspect-ratio preservation and hardware-accelerated encode/decode.
 
 ### Reliability and resource handling
@@ -31,7 +31,7 @@
 - Rejected invalid and excessive HTTP Content-Length values and bounded header/body/total request size.
 - Added an overall deadline for incomplete HTTP requests.
 - Limited the agent to Tailscale IPv4/IPv6 peers and loopback.
-- Register replay nonces only after HMAC signature validation.
+- Registers replay nonces only after HMAC signature validation.
 - Removed pairing secrets from normal startup logs.
 - Improved subprocess pipe handling and added timeouts.
 
