@@ -62,7 +62,7 @@ The Android controller refreshes the dashboard while it is open.
 
 The Android app uses a dark, cinematic control-center design with:
 
-- Home / Activity / Settings navigation
+- Home / Control / Activity / Settings bottom navigation
 - Mac connection card
 - Connection status
 - Restrict / Allow controls
