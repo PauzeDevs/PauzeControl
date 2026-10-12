@@ -1,4 +1,4 @@
-name: Android APK
+name: PauzeControl v1.3.0 Android Release
 
 on:
   push:
