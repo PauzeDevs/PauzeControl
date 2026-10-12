@@ -4,6 +4,8 @@
 **Distribution:** GitHub APK downloads only; not a Google Play release  
 **Signing:** Debug signing for direct installation and testing
 
+**GitHub releases:** [Beta v1.3.1-beta.1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.1-beta.1) · [Stable v1.3.1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.1)
+
 ## Changes
 
 - Corrected the Android action-switch thumb mapping: ON keeps the thumb on the right; OFF positions it on the left.
