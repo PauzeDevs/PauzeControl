@@ -13,6 +13,8 @@ jobs:
   build-preview:
     name: Build and publish Android preview APK
     runs-on: ubuntu-latest
+    env:
+      HAS_RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' }}
     steps:
       - name: Checkout release branch
         uses: actions/checkout@v4
@@ -61,7 +63,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish visible GitHub pre-release
-        if: ${{ secrets.GH_RELEASE_TOKEN != '' }}
+        if: ${{ env.HAS_RELEASE_TOKEN == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GH_RELEASE_TOKEN }}
@@ -98,7 +100,7 @@ jobs:
             The signed stable release workflow requires the maintained release keystore. The repository Actions signing secrets must be configured before a final stable APK can be built. Do not treat this preview APK as the stable production package.
 
       - name: Explain why the release page was not published
-        if: ${{ secrets.GH_RELEASE_TOKEN == '' }}
+        if: ${{ env.HAS_RELEASE_TOKEN != 'true' }}
         run: |
           echo "::warning::APK built and verified, but GitHub rejected release creation with the workflow token."
           echo "Configure a fine-grained PAT as the GH_RELEASE_TOKEN repository Actions secret."
