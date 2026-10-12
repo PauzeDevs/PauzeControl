@@ -46,13 +46,13 @@
 - **Follow-up:** Never log the secret; log only that secure initialization succeeded and document a rotation procedure if this log has already been captured.
 
 ### H-03 — Android release workflow references a missing Gradle wrapper
-- **Location:** `.github/workflows/android-release.yml:27–29`
+- **Location:** `.github/workflows/android-release.yml:33–38`
 - **Evidence:** The workflow runs `chmod +x ./gradlew` and later `./gradlew assembleRelease`, but the repository tree contains no `android/gradlew` or Gradle wrapper files.
 - **Impact:** The tagged/manual Android release workflow will fail before producing an APK.
 - **Follow-up:** Either commit a standard Gradle wrapper or use the already configured Gradle installation consistently in the release workflow.
 
 ### H-04 — Release workflow can publish an unsigned APK
-- **Location:** `.github/workflows/android-release.yml:32–48`; `android/app/build.gradle:1–25`
+- **Location:** `.github/workflows/android-release.yml:37–49`; `android/app/build.gradle:1–25`
 - **Evidence:** The workflow builds `assembleRelease`, selects the first APK found, and uploads it; the Android Gradle configuration does not define a release signing configuration or signing step.
 - **Impact:** The selected artifact is expected to be `app-release-unsigned.apk`, which Android will not install as a normal release package. The workflow also does not assert that the selected APK is signed.
 - **Follow-up:** Set up a secure signing process for releases and validate the artifact name/signature before attaching it to a release.
