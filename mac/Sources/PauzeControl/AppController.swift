@@ -18,9 +18,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         do {
             let token = try SecurityStore.shared.token()
 
-            print(
-                "[PauzeControl] pairing secret: \(token)"
-            )
+            NSLog("[PauzeControl] secure pairing secret loaded.")
 
             server = ControlServer(
                 token: token,
