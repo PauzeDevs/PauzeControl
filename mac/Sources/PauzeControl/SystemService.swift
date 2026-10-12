@@ -170,8 +170,18 @@ enum SystemService {
     }
 
     private static func audio() -> (volume: Int, muted: Bool) {
-        let volume = Int(commandOutput("/usr/bin/osascript", ["-e", "output volume of (get volume settings)"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
-        let muted = commandOutput("/usr/bin/osascript", ["-e", "output muted of (get volume settings)"])?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "true"
+        let script = """
+        set volumeSettings to get volume settings
+        set outputLevel to output volume of volumeSettings
+        set isMuted to output muted of volumeSettings
+        return (outputLevel as string) & "|" & (isMuted as string)
+        """
+        let output = commandOutput("/usr/bin/osascript", ["-e", script]) ?? ""
+        let values = output.components(separatedBy: "|")
+        let volume = values.first
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) } ?? 0
+        let muted = values.count > 1 &&
+            values[1].trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "true"
         return (max(0, min(100, volume)), muted)
     }
 
