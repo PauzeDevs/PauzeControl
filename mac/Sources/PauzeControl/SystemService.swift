@@ -198,22 +198,70 @@ enum SystemService {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = output
-        process.standardError = Pipe()
-        do { try process.run() } catch { return nil }
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        // Drain stdout while the child is running; waiting first can deadlock
+        // when a subprocess fills its pipe. A timeout also bounds bad OS calls.
+        let timeout = DispatchWorkItem {
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + 5,
+            execute: timeout
+        )
+        let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        return String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        timeout.cancel()
+
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     private static func run(_ executable: String, _ arguments: [String]) throws {
         let process = Process()
-        let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = pipe
-        do { try process.run(); process.waitUntilExit() }
-        catch { throw NSError(domain: "PauzeControl.System", code: 500, userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start."]) }
-        guard process.terminationStatus == 0 else { throw NSError(domain: "PauzeControl.System", code: 500, userInfo: [NSLocalizedDescriptionKey: "macOS rejected the requested system action."]) }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            throw NSError(
+                domain: "PauzeControl.System",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start."]
+            )
+        }
+
+        let timeout = DispatchWorkItem {
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + 10,
+            execute: timeout
+        )
+        process.waitUntilExit()
+        timeout.cancel()
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "PauzeControl.System",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "macOS rejected or timed out the requested system action."]
+            )
+        }
     }
 }
