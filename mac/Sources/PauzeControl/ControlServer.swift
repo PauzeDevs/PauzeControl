@@ -865,7 +865,7 @@ private struct HTTPRequest {
         }
         let requestParts = line.split(separator: " ", omittingEmptySubsequences: true)
         guard requestParts.count == 3,
-              requestParts[2] == "HTTP/1.1" || requestParts[2] == "HTTP/1.0"
+              (requestParts[2] == "HTTP/1.1" || requestParts[2] == "HTTP/1.0")
         else {
             return nil
         }
