@@ -1,8 +1,12 @@
 # PauzeControl v1.3.0 — Release Notes
 
-**Release track:** Stable candidate  
+**Release track:** Published debug/testing build — not stable production-signed  
 **Android application ID:** com.pauze.control  
 **Version name / code:** 1.3.0 / 2
+
+**Download:** [v1.3.0 APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.3.0/PauzeControl-v1.3.0-debug.apk) · [Release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0) · [RC1 preview](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0-rc.1)
+
+> The published APK is a debug-signed test build. The production stable-signed APK is not available until the private release keystore and CI signing configuration are ready.
 
 ## Highlights
 
@@ -47,7 +51,7 @@
 - Tailscale connectivity between the devices.
 - macOS Screen Recording permission for live screen capture; Accessibility/Input Monitoring may be needed for the restriction layer.
 
-## Before distribution
+## Before stable distribution
 - Confirm CI succeeds for the exact release commit.
 - Configure the four repository Actions signing secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.
 - Verify the signed APK with apksigner and record its SHA-256 checksum.
