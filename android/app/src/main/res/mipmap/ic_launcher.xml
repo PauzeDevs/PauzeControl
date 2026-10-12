@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#080B16"
+        android:pathData="M0,0 H108 V108 H0 Z" />
+    <path
+        android:fillColor="#8A5CFF"
+        android:pathData="M25,19 C25,15.7 27.7,13 31,13 H61 C77.2,13 88,23.8 88,39.5 C88,55.2 77.2,66 61,66 H47 V88 C47,92.4 43.4,96 39,96 H33 C28.6,96 25,92.4 25,88 Z" />
+    <path
+        android:fillColor="#4D91FF"
+        android:pathData="M25,60 H47 V88 C47,92.4 43.4,96 39,96 H33 C28.6,96 25,92.4 25,88 Z" />
+    <path
+        android:fillColor="#080B16"
+        android:pathData="M47,27 H60 C68.2,27 74,32.3 74,40 C74,47.6 68.2,53 60,53 H47 Z" />
+    <path
+        android:fillColor="#31C8F4"
+        android:pathData="M47,27 H60 C68.2,27 74,32.3 74,40 C74,47.6 68.2,53 60,53 H47 Z" />
+</vector>
