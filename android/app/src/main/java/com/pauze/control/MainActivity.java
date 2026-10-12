@@ -325,7 +325,7 @@ public final class MainActivity extends Activity {
                 item.setBackgroundResource(R.drawable.nav_item_selected);
             } else {
                 item.setTextColor(MUTED);
-                item.setBackgroundColor(Color.TRANSPARENT);
+                item.setBackgroundResource(R.drawable.nav_item_default);
             }
         }
     }
