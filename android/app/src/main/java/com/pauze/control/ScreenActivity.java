@@ -178,8 +178,10 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        decoderSurface = holder.getSurface();
-        surfaceReady = true;
+        synchronized (this) {
+            decoderSurface = holder.getSurface();
+            surfaceReady = true;
+        }
 
         if (streamClient == null &&
                 host != null && token != null &&
@@ -205,11 +207,13 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        surfaceReady = false;
         screenSurface.removeCallbacks(automaticReconnectRunnable);
-        decoderSurface = null;
-        aspectApplied = false;
-        releaseDecoder();
+        synchronized (this) {
+            surfaceReady = false;
+            decoderSurface = null;
+            aspectApplied = false;
+            releaseDecoder();
+        }
 
         ScreenStreamClient activeClient = streamClient;
         if (activeClient != null) {
@@ -351,10 +355,15 @@ public final class ScreenActivity extends Activity
                 input.clear();
 
                 if (accessUnit.length > input.remaining()) {
-                    activeDecoder.queueInputBuffer(
-                            inputIndex, 0, 0,
-                            Math.max(0L, ptsMicroseconds), 0
-                    );
+                    try {
+                        activeDecoder.queueInputBuffer(
+                                inputIndex, 0, 0,
+                                Math.max(0L, ptsMicroseconds), 0
+                        );
+                    } catch (Exception ignored) {
+                        // Resetting below releases the input slot if the
+                        // codec rejects an empty buffer during reconfiguration.
+                    }
                     releaseDecoder();
                     return;
                 }
@@ -816,18 +825,21 @@ public final class ScreenActivity extends Activity
 
     @Override
     protected void onDestroy() {
-        shuttingDown = true;
-        surfaceReady = false;
         screenSurface.removeCallbacks(automaticReconnectRunnable);
         uiHandler.removeCallbacksAndMessages(null);
 
-        ScreenStreamClient activeClient = streamClient;
-        if (activeClient != null) {
-            activeClient.stop();
+        synchronized (this) {
+            shuttingDown = true;
+            surfaceReady = false;
+            decoderSurface = null;
+            ScreenStreamClient activeClient = streamClient;
+            streamClient = null;
+            if (activeClient != null) {
+                activeClient.stop();
+            }
+            releaseDecoder();
         }
 
-        streamClient = null;
-        releaseDecoder();
         super.onDestroy();
     }
 }
