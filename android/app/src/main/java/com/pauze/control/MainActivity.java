@@ -25,6 +25,7 @@ import org.json.JSONObject;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
 
@@ -70,6 +71,7 @@ public final class MainActivity extends Activity {
     private boolean macMuted;
     private boolean activityResumed;
     private int consecutiveStatusFailures;
+    private final AtomicBoolean automaticStatusRequestInFlight = new AtomicBoolean(false);
     private static final int STATUS_FAILURES_BEFORE_OFFLINE = 2;
 
     private final Handler mainHandler =
@@ -603,42 +605,48 @@ public final class MainActivity extends Activity {
     private void refreshStatus(
             boolean userInitiated
     ) {
-        String host =
-                hostInput.getText()
-                        .toString()
-                        .trim();
+        // The five-second poll must not enqueue more work than the single
+        // executor can service when a host is slow or repeatedly timing out.
+        if (!userInitiated &&
+                !automaticStatusRequestInFlight.compareAndSet(false, true)) {
+            return;
+        }
 
-        executor.execute(
-                () -> {
-                    try {
-                        String token =
-                                secureStore.getToken();
-
-                        if (host.isEmpty() ||
-                                token.isEmpty()) {
-                            if (userInitiated) {
-                                throw new IllegalStateException(
-                                        "Save the connection first."
-                                );
-                            }
-
-                            return;
-                        }
-
-                        requestStatus(
-                                host,
-                                token,
-                                userInitiated
-                        );
-                    } catch (Exception error) {
+        String host = hostInput.getText().toString().trim();
+        try {
+            executor.execute(() -> {
+                try {
+                    String token = secureStore.getToken();
+                    if (host.isEmpty() || token.isEmpty()) {
                         if (userInitiated) {
-                            showError(error.getMessage());
-                        } else {
-                            recordStatusFailure();
+                            throw new IllegalStateException(
+                                    "Save the connection first."
+                            );
                         }
+                        return;
+                    }
+
+                    requestStatus(host, token, userInitiated);
+                } catch (Exception error) {
+                    if (userInitiated) {
+                        showError(error.getMessage());
+                    } else {
+                        recordStatusFailure();
+                    }
+                } finally {
+                    if (!userInitiated) {
+                        automaticStatusRequestInFlight.set(false);
                     }
                 }
-        );
+            });
+        } catch (RuntimeException rejected) {
+            if (!userInitiated) {
+                automaticStatusRequestInFlight.set(false);
+                recordStatusFailure();
+            } else {
+                showError(rejected.getMessage());
+            }
+        }
     }
 
     private void requestStatus(
