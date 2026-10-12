@@ -4,7 +4,7 @@
 
 PauzeControl consists of an Android controller and a native macOS agent. They communicate directly over a private Tailscale network; the project does not require a hosted control backend.
 
-> **Release status:** the source tree is being prepared for version **1.3.0**. Use the Releases page for published APKs; use the build steps below when producing a local build. A signed release requires the release keystore described in [Build notes](docs/BUILD_NOTES.md).
+> **Downloads:** [PauzeControl v1.3.0 APK (debug build)](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.3.0/PauzeControl-v1.3.0-debug.apk) · [v1.3.0 GitHub release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0) · [v1.3.0 RC1 preview](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0-rc.1).\n>\n> **Important:** these published APKs are debug-signed testing builds, not the final stable production-signed APK. The stable signing workflow requires a maintained release keystore and configured GitHub Actions secrets. See [Build notes](docs/BUILD_NOTES.md).
 
 ## Features
 
