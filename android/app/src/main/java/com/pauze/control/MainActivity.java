@@ -61,6 +61,7 @@ public final class MainActivity extends Activity {
     private ScrollView rootScroll;
 
     private TextView navDashboard;
+    private TextView navControls;
     private TextView navActivity;
     private TextView navSettings;
 
@@ -129,6 +130,7 @@ public final class MainActivity extends Activity {
         volumeSeek = findViewById(R.id.volumeSeek);
 
         navDashboard = findViewById(R.id.navDashboard);
+        navControls = findViewById(R.id.navControls);
         navActivity = findViewById(R.id.navActivity);
         navSettings = findViewById(R.id.navSettings);
         restrictionControl = findViewById(R.id.restrictionCard);
@@ -282,25 +284,50 @@ public final class MainActivity extends Activity {
 
     private void setupNavigation() {
         navDashboard.setOnClickListener(
+                view -> scrollTo(statusCard, navDashboard)
+        );
+
+        navControls.setOnClickListener(
                 view -> scrollTo(
-                        statusCard,
-                        navDashboard
+                        findViewById(R.id.controlsAnchor),
+                        navControls
                 )
         );
 
         navActivity.setOnClickListener(
                 view -> scrollTo(
-                        powerCard,
+                        findViewById(R.id.activityAnchor),
                         navActivity
                 )
         );
 
         navSettings.setOnClickListener(
                 view -> scrollTo(
-                        hostInput,
+                        findViewById(R.id.settingsAnchor),
                         navSettings
                 )
         );
+
+        selectNavigation(navDashboard);
+    }
+
+    private void selectNavigation(TextView selected) {
+        TextView[] items = {
+                navDashboard,
+                navControls,
+                navActivity,
+                navSettings
+        };
+
+        for (TextView item : items) {
+            if (item == selected) {
+                item.setTextColor(WHITE);
+                item.setBackgroundResource(R.drawable.nav_item_selected);
+            } else {
+                item.setTextColor(MUTED);
+                item.setBackgroundColor(Color.TRANSPARENT);
+            }
+        }
     }
 
     private void scrollTo(
@@ -317,10 +344,7 @@ public final class MainActivity extends Activity {
                 )
         );
 
-        navDashboard.setTextColor(MUTED);
-        navActivity.setTextColor(MUTED);
-        navSettings.setTextColor(MUTED);
-        selected.setTextColor(WHITE);
+        selectNavigation(selected);
 
         selected.animate()
                 .scaleX(1.08f)
