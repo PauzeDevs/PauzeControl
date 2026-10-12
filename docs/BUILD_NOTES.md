@@ -4,6 +4,8 @@ These instructions build the Android controller and macOS agent from source. The
 
 ## Release identity
 
+> **Current downloads:** [v1.3.0 debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.3.0/PauzeControl-v1.3.0-debug.apk) · [v1.3.0 release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0) · [v1.3.0 RC1 preview](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0-rc.1). These APKs are debug-signed testing builds, not the final stable production-signed APK.
+
 - Android application ID: com.pauze.control
 - Release version name: 1.3.0
 - Release version code: 2
