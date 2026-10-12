@@ -1,161 +1,120 @@
-# PAUZE CONTROL
+# PauzeControl
 
-> Private Mac → Android remote control and adaptive H.264 live screen viewer for your own macOS device.
+**Private macOS control center and live H.264 screen viewer for Android.**
 
-PauzeControl is a two-part system built around a private connection between an Android controller and a Mac agent. It is designed to give you a clean control-center experience without relying on a paid cloud/API service.
+PauzeControl consists of an Android controller and a native macOS agent. They communicate directly over a private Tailscale network; the project does not require a hosted control backend.
 
-## ✨ Current Features
+> **Release status:** the source tree is being prepared for version **1.3.0**. Use the Releases page for published APKs; use the build steps below when producing a local build. A signed release requires the release keystore described in [Build notes](docs/BUILD_NOTES.md).
 
-### 🖥️ Live Mac Screen
+## Features
 
-- Real-time **H.264** screen streaming from macOS to Android.
-- Native macOS capture using **ScreenCaptureKit**.
-- Native hardware-accelerated H.264 encoding through **VideoToolbox**.
-- Android hardware decoding through **MediaCodec**.
-- Adaptive streaming profiles:
-  - 🔌 **On charger:** up to **1920×1080 (1080p) / 60 FPS**.
-  - 🔋 **Battery ≥30%:** up to **1280×720 / 30 FPS**.
-  - 🪫 **Battery <30%:** up to **1280×720 / 20 FPS**.
-  - 🪫 **Battery <15%:** up to **1280×720 / 15 FPS** saver mode.
-- Preserves the Mac display's aspect ratio instead of stretching the image.
-- Dedicated fullscreen viewer with YouTube-style controls and a live **Quality** selector.
-- View-only streaming — the Android viewer does not directly control the Mac screen.
+### Android control center
+- Four persistent navigation tabs: Home, Control, Activity, and Settings.
+- Connection card and live macOS system dashboard.
+- Remote restriction/allow commands, lock, sleep, restart, shutdown, mute/unmute, and volume control.
+- Connection status and automatic refresh while the app is foregrounded.
+- PauzeControl application icon and dark control-center UI.
 
-The stream is only started while there is an active viewer. When nobody is watching, the capture and encoder stop completely to avoid unnecessary CPU/GPU, memory and battery use.
+### Live screen
+- Native macOS display capture through ScreenCaptureKit.
+- Hardware-accelerated H.264 encoding using VideoToolbox.
+- Android hardware decoding through MediaCodec.
+- Full-screen viewer with a manual quality selector and reconnect controls.
+- Aspect-ratio-preserving video presentation; the view is read-only.
 
-### 🔒 Remote Restriction
+Manual quality targets:
 
-The Android controller can send authenticated commands to the Mac:
+| Target | Frame-rate options |
+|---|---|
+| 144p, 240p, 360p, 480p | 30 FPS |
+| 720p | 30 or 60 FPS |
+| 1080p | 30 or 60 FPS |
 
-- **RESTRICT** — activate the macOS restriction layer and block normal keyboard/mouse input.
-- **ALLOW** — remove the restriction.
-- **STATUS** — retrieve the current Mac state.
+The selected target is sent to the Mac and persisted on Android. Battery level does not silently replace the selected target. Actual output can still vary with display dimensions, available hardware resources, thermal limits, and network conditions.
 
-The restriction layer is separate from the macOS login screen and is not intended to be a replacement for macOS security.
+### macOS agent
+- Authenticated HTTP control API.
+- HMAC-SHA256 request authentication with timestamps and one-use nonces.
+- Pairing secret stored in the macOS Keychain; Android stores its copy through Android Keystore-backed AES-GCM encryption.
+- System telemetry for CPU, memory, disk, battery, uptime, macOS version, and audio state.
+- Optional restriction overlay and input event tap, subject to macOS permissions.
 
-### ⚡ Mac Controls
+## Requirements
 
-PauzeControl supports authenticated requests for:
+### Android build
+- JDK 17.
+- Android SDK Platform 35 and Android Build Tools installed.
+- Gradle 8.9.
+- Android 8.0 (API 26) or newer on the device.
 
-- Lock
-- Sleep
-- Restart
-- Shutdown
-- Audio mute/unmute
-- Volume control from 0–100
-
-Restart and shutdown actions are confirmed in the Android UI.
-
-### 📊 Live System Dashboard
-
-The Mac status endpoint can provide:
-
-- CPU usage
-- Memory usage
-- Disk information
-- Battery information
-- Uptime
-- macOS version
-- Audio state/telemetry
-
-The Android controller refreshes the dashboard while it is open.
-
-### 📱 Android Control Center
-
-The Android app uses a dark, cinematic control-center design with:
-
-- Home / Activity / Settings navigation
-- Mac connection card
-- Connection status
-- Restrict / Allow controls
-- Refresh control
-- Live Screen entry point
-- Security information
-- Recent activity
-- Animated UI interactions and repeatable scroll-reveal transitions
-- Slide-style Mac restriction control with ON/OFF behavior
-- Monochrome custom-symbol UI accents instead of platform emoji icons
-- Scrollable layouts for smaller displays
-
-### 🌐 Private Networking
-
-PauzeControl is designed to work over **Tailscale** as the private network transport.
-
-There is no required paid cloud control server or third-party API for the core application.
-
-## 🔐 Security
-
-PauzeControl uses several layers of local authentication:
-
-- The macOS agent generates a 256-bit pairing secret and stores it in the macOS Keychain.
-- Android stores the pairing secret using an Android Keystore-backed AES-GCM key.
-- Control requests use HMAC-SHA256 authentication over a timestamp, nonce, method, path and request body.
-- The Mac rejects stale timestamps and reused nonces.
-- The intended deployment is a private Tailscale network.
-
-**Important:** PauzeControl is intended for controlling your own devices. Do not expose the control service directly to the public internet.
-
-## 🍎 macOS Requirements
-
-- macOS 14 or newer for the current Swift package target.
-- Screen Recording permission is required for live screen viewing.
+### macOS agent
+- macOS 14 or newer.
+- Xcode Command Line Tools with Swift toolchain.
+- Screen Recording permission for live screen capture.
 - Accessibility/Input Monitoring permissions may be required for the restriction layer.
-- Tailscale is recommended for private device-to-device connectivity.
+- Tailscale installed and connected on both devices.
 
-After changing Screen Recording permissions, restart PauzeControl so ScreenCaptureKit can use the updated authorization.
+## Quick start
 
-## 🛠️ Building
+1. Connect the Mac and Android device to the same trusted Tailscale network.
+2. Build and install the Android APK using the [Android build instructions](docs/BUILD_NOTES.md#android-debug-build).
+3. Build/install the Mac agent using the [macOS instructions](docs/BUILD_NOTES.md#macos-agent).
+4. During installation, securely record the displayed pairing secret. Enter the Mac's Tailscale IP address or resolvable Tailscale hostname and the pairing secret in Android, then save the connection.
+5. Grant the required macOS permissions, restart the agent after changing Screen Recording access, and test Status before trying restriction or power commands.
 
-### macOS
+Use only on devices you own or are explicitly authorized to administer.
 
-From the `mac/` directory:
+## Build and release
 
-```bash
-swift package dump-package
-swift build -c release
-```
+The project has separate CI workflows for:
+- Android debug builds (Build Android).
+- macOS package build/type-check plus Swift syntax checks (Validate macOS).
+- Signed Android release APKs (Android APK), triggered by a v-prefixed tag or manual workflow dispatch.
 
-The repository also includes `mac/install.sh` for installing PauzeControl as a per-user app bundle and LaunchAgent. The bundle includes the Screen Recording usage description required by macOS.
+The signed release workflow requires four repository Actions secrets. Setup and exact commands are documented in **[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)**. A green debug build alone does not mean a signed release APK has been generated.
 
-### Android
+## Security model and limitations
 
-Open `android/` in Android Studio or build with Gradle:
+- The Mac agent accepts connections from Tailscale IPv4 peers in 100.64.0.0/10, Tailscale IPv6 peers in fd7a:115c:a1e0::/48, and loopback.
+- Do not expose TCP port 47777 directly to the public internet. The application protocol uses HTTP rather than end-to-end TLS; its intended protection boundary is the private network plus HMAC authentication for requests.
+- Keep the Android pairing secret private. Do not paste it into issues, screenshots, logs, or public posts.
+- The restriction overlay is a software control layer, not a hardware or operating-system security boundary. A person with physical access can power off the Mac, use recovery tools, or otherwise act outside the logged-in session.
+- Restart the Mac agent after changing Screen Recording permissions.
 
-```bash
-cd android
-gradle assembleDebug
-```
+## Troubleshooting
 
-GitHub Actions builds the Android debug APK automatically.
+**Android cannot connect**
+- Confirm both devices are connected to Tailscale.
+- Enter only the Mac Tailscale hostname/IP (with optional port), without a URL path.
+- Confirm the agent is running and listening on port 47777.
+- Re-save the pairing secret if authentication fails, and check that the Mac/Android clocks are accurate.
 
-## 📁 Project Structure
+**Live screen is black or immediately reconnects**
+- Grant Screen Recording permission to PauzeControl in macOS Privacy & Security.
+- Restart the agent after changing permission.
+- Try 720p/30 FPS first, then increase quality if the link and Mac can sustain it.
 
-```text
-PauzeControl/
-├── android/                    # Android controller APK
-├── mac/                        # macOS agent + screen capture
-├── .github/workflows/          # CI builds and validation
-├── SECURITY.md                 # Security notes
-├── LICENSE                    # PauzeControl license
-└── README.md
-```
+**Release workflow fails before building**
+- The repository Actions secrets for release signing may be absent or invalid. See [release signing configuration](docs/BUILD_NOTES.md#configure-github-actions-release-signing).
 
-## ⚠️ Limitations
+**APK installs but Android rejects an update**
+- Android requires an update to be signed with the same signing key as the installed build. Do not replace or discard the release keystore. A differently signed APK may require uninstalling the older app first, which removes its app-local preferences.
 
-PauzeControl is a software control/restriction layer, not a hardware security boundary. Someone with physical access to the Mac can still force a power-off, boot into another environment, use recovery tools, or otherwise act outside the logged-in session.
+## Project layout
 
-Live screen streaming depends on macOS permissions and the available CPU/GPU/network resources. The configured profile is a maximum target; actual FPS can vary depending on the Mac, display, network, thermal state and current workload. 1080p/60 FPS is used only while the Mac reports AC/charging power.
+- android/ — Android controller (Java + XML)
+- mac/ — Native macOS agent (Swift)
+- docs/BUILD_NOTES.md — reproducible build, signing, and verification
+- AUDIT_REPORT.md — audit remediation and remaining runtime tests
+- SECURITY.md — security notes
+- .github/workflows/ — CI and release build workflows
 
-## 🚧 Project Status
-
-PauzeControl is actively being developed. The current build includes the Android control center, authenticated Mac controls, system telemetry, adaptive H.264 live-screen streaming and power-aware capture behavior. Further work includes polishing the macOS background service/auto-start experience and continued testing across different Mac configurations.
-
-## 📜 License
+## License
 
 Copyright © 2026 PauzeDevs. All rights reserved.
 
-PauzeControl is source-available but **not open-source**. See [`LICENSE`](LICENSE) for the full terms. No permission is granted to copy, modify, redistribute, repackage, sell, sublicense or publish derivative versions of the software without prior written permission from PauzeDevs.
+PauzeControl is source-available and **not open-source** under the repository's current terms. See LICENSE for the governing conditions. No permission is granted to redistribute, repackage, sell, sublicense, or publish derivative builds without prior written permission from PauzeDevs.
 
 ---
 
-**© 2026 PauzeDevs — PauzeControl. All rights reserved.**
+© 2026 PauzeDevs — PauzeControl.

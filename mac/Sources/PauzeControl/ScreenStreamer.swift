@@ -31,8 +31,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         let bitrate60: Int
     }
 
-    // Hardware-encoder ceiling. The active power profile decides the actual
-    // resolution/FPS/bitrate for each streaming session.
+    // Hardware-encoder ceiling. The selected quality directly determines the
+    // resolution, frame rate, and bitrate for each streaming session.
     static let maxWidth = 1920
     static let maxHeight = 1080
     static let maxFPS = 60
@@ -53,12 +53,12 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var forceNextKeyframe = true
     private var retryWorkItem: DispatchWorkItem?
     private var captureAttempt = 0
-    private var activeFPS = ScreenStreamer.maxFPS
-    private var activeBitrate = ScreenStreamer.targetAverageBitrate
-    private var activeProfileName = "AC • 1080p • 60 FPS"
+    private var activeFPS = 30
+    private var activeBitrate = 4_000_000
+    private var activeProfileName = "720p • 30 FPS"
 
-    private var requestedQuality = "auto"
-    private var requestedFPS: Int?
+    private var requestedQuality = "720p"
+    private var requestedFPS: Int? = 30
 
     private override init() { super.init() }
 
@@ -73,9 +73,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         let normalized = quality.lowercased()
         let selectedFPS: Int
 
-        if normalized == "auto" {
-            selectedFPS = 0
-        } else if let fps {
+        if let fps {
             guard fps == 30 || fps == 60 else {
                 return false
             }
@@ -91,10 +89,10 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         queue.async {
             let changed = self.requestedQuality != normalized ||
-                self.requestedFPS != (selectedFPS == 0 ? nil : selectedFPS)
+                self.requestedFPS != selectedFPS
 
             self.requestedQuality = normalized
-            self.requestedFPS = selectedFPS == 0 ? nil : selectedFPS
+            self.requestedFPS = selectedFPS
 
             guard changed, !self.subscribers.isEmpty else {
                 return
@@ -110,16 +108,6 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         _ raw: String
     ) -> RequestedQuality? {
         switch raw.lowercased() {
-        case "auto":
-            return RequestedQuality(
-                name: "Auto",
-                maxWidth: Self.maxWidth,
-                maxHeight: Self.maxHeight,
-                defaultFPS: Self.maxFPS,
-                supports60FPS: true,
-                bitrate30: 4_000_000,
-                bitrate60: 8_000_000
-            )
         case "144p":
             return RequestedQuality(
                 name: "144p",
@@ -285,18 +273,14 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func startStream(for display: SCDisplay) {
         let sourceWidth = max(Int(display.width), 2)
         let sourceHeight = max(Int(display.height), 2)
-        let powerProfile = SystemService.streamingProfile()
-        let requested = qualityOption(requestedQuality) ?? qualityOption("auto")!
-
+        let requested = qualityOption(requestedQuality) ?? qualityOption("720p")!
         let requestedFPS = self.requestedFPS ?? requested.defaultFPS
-        let effectiveFPS = min(requestedFPS, powerProfile.fps, Self.maxFPS)
-        let requestedBitrate = effectiveFPS >= 60 ? requested.bitrate60 : requested.bitrate30
 
-        activeFPS = effectiveFPS
-        activeBitrate = min(requestedBitrate, powerProfile.bitrate)
+        activeFPS = min(requestedFPS, Self.maxFPS)
+        activeBitrate = activeFPS >= 60 ? requested.bitrate60 : requested.bitrate30
 
-        let effectiveMaxWidth = min(requested.maxWidth, powerProfile.maxWidth, Self.maxWidth)
-        let effectiveMaxHeight = min(requested.maxHeight, powerProfile.maxHeight, Self.maxHeight)
+        let effectiveMaxWidth = min(requested.maxWidth, Self.maxWidth)
+        let effectiveMaxHeight = min(requested.maxHeight, Self.maxHeight)
 
         let scale = min(
             1.0,
@@ -315,9 +299,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             effectiveMaxHeight
         )
 
-        activeProfileName = requestedQuality == "auto"
-            ? powerProfile.name
-            : "\(requested.name) • \(activeFPS) FPS"
+        activeProfileName = "\(requested.name) • \(activeFPS) FPS"
         createResizePoolIfNeeded()
 
         print("[PauzeControl] Streaming profile: \(activeProfileName) • \(outputWidth)x\(outputHeight) • \(activeFPS) FPS • \(activeBitrate / 1_000_000) Mbps")
@@ -429,9 +411,11 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         outputWidth = 0
         outputHeight = 0
         resizePool = nil
-        activeFPS = Self.maxFPS
-        activeBitrate = Self.targetAverageBitrate
-        activeProfileName = "AC • 1080p • 60 FPS"
+        if let requested = qualityOption(requestedQuality) {
+            activeFPS = self.requestedFPS ?? requested.defaultFPS
+            activeBitrate = activeFPS >= 60 ? requested.bitrate60 : requested.bitrate30
+            activeProfileName = "\(requested.name) • \(activeFPS) FPS"
+        }
     }
 
     private func invalidateEncoder() {

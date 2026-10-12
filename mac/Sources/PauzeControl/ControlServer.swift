@@ -11,7 +11,8 @@ final class ControlServer {
 
     private let queue = DispatchQueue(
         label: "com.pauze.control.server",
-        qos: .userInitiated
+        qos: .userInitiated,
+        attributes: .concurrent
     )
 
     private var listener: NWListener?
@@ -71,7 +72,25 @@ final class ControlServer {
         listener.start(queue: queue)
     }
 
+    private static let maximumRequestDuration: TimeInterval = 10
+    private static let maximumRequestBytes = 80 * 1024
+    private static let maximumHeaderBytes = 16 * 1024
+    private static let maximumBodyBytes = 64 * 1024
+
     private func handle(_ connection: NWConnection) {
+        guard Self.isAllowedPeer(connection.endpoint) else {
+            connection.cancel()
+            return
+        }
+
+        let requestDeadline = DispatchWorkItem {
+            connection.cancel()
+        }
+        queue.asyncAfter(
+            deadline: .now() + Self.maximumRequestDuration,
+            execute: requestDeadline
+        )
+
         connection.stateUpdateHandler = {
             [weak self, weak connection] state in
 
@@ -80,7 +99,8 @@ final class ControlServer {
             if case .ready = state {
                 self.receive(
                     from: connection,
-                    accumulated: Data()
+                    accumulated: Data(),
+                    deadline: requestDeadline
                 )
             }
         }
@@ -90,7 +110,8 @@ final class ControlServer {
 
     private func receive(
         from connection: NWConnection,
-        accumulated: Data
+        accumulated: Data,
+        deadline: DispatchWorkItem
     ) {
         connection.receive(
             minimumIncompleteLength: 1,
@@ -98,17 +119,24 @@ final class ControlServer {
         ) { [weak self] data, _, complete, error in
 
             guard let self else {
+                deadline.cancel()
                 connection.cancel()
                 return
             }
 
             var buffer = accumulated
-
             if let data {
                 buffer.append(data)
             }
 
+            guard !Self.exceedsRequestLimits(buffer) else {
+                deadline.cancel()
+                connection.cancel()
+                return
+            }
+
             if let request = HTTPRequest.parse(buffer) {
+                deadline.cancel()
                 if request.method == "GET",
                    request.path == "/v1/screen" {
                     self.startScreenStream(
@@ -117,7 +145,6 @@ final class ControlServer {
                     )
                 } else {
                     let response = self.handle(request)
-
                     connection.send(
                         content: response,
                         completion: .contentProcessed { _ in
@@ -125,19 +152,106 @@ final class ControlServer {
                         }
                     )
                 }
-
                 return
             }
 
             if complete || error != nil {
+                deadline.cancel()
                 connection.cancel()
                 return
             }
 
             self.receive(
                 from: connection,
-                accumulated: buffer
+                accumulated: buffer,
+                deadline: deadline
             )
+        }
+    }
+
+    private static func exceedsRequestLimits(_ data: Data) -> Bool {
+        guard data.count <= maximumRequestBytes else {
+            return true
+        }
+
+        let delimiter = Data([13, 10, 13, 10])
+        guard let separator = data.range(of: delimiter) else {
+            return data.count > maximumHeaderBytes
+        }
+
+        let headerData = data[..<separator.lowerBound]
+        guard headerData.count <= maximumHeaderBytes,
+              let headerText = String(data: headerData, encoding: .utf8)
+        else {
+            return true
+        }
+
+        var parsedLength: Int?
+        for line in headerText.components(separatedBy: "\r\n").dropFirst() {
+            guard let colon = line.firstIndex(of: ":") else {
+                continue
+            }
+            let name = line[..<colon]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard name == "content-length" else {
+                continue
+            }
+
+            // Duplicated, malformed, negative, or excessive lengths are
+            // rejected before request parsing performs any collection slice.
+            guard parsedLength == nil,
+                  let length = Int(line[line.index(after: colon)...]
+                    .trimmingCharacters(in: .whitespacesAndNewlines)),
+                  length >= 0,
+                  length <= maximumBodyBytes
+            else {
+                return true
+            }
+            parsedLength = length
+        }
+
+        let receivedBodyLength = data.distance(
+            from: separator.upperBound,
+            to: data.endIndex
+        )
+        guard receivedBodyLength <= maximumBodyBytes else {
+            return true
+        }
+        if let parsedLength {
+            if receivedBodyLength > parsedLength {
+                return true
+            }
+        } else if receivedBodyLength > 0 {
+            return true
+        }
+        return false
+    }
+
+    private static func isAllowedPeer(_ endpoint: NWEndpoint) -> Bool {
+        guard case let .hostPort(host, _) = endpoint else {
+            return false
+        }
+
+        switch host {
+        case .ipv4(let address):
+            let bytes = Array(address.rawValue)
+            guard bytes.count == 4 else { return false }
+            // Tailscale IPv4 addresses use 100.64.0.0/10. Loopback is
+            // retained for local diagnostics and same-Mac testing.
+            return (bytes[0] == 100 && (64...127).contains(Int(bytes[1]))) ||
+                bytes[0] == 127
+        case .ipv6(let address):
+            let bytes = Array(address.rawValue)
+            guard bytes.count == 16 else { return false }
+            let tailscalePrefix: [UInt8] = [0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0]
+            let isTailscale = Array(bytes.prefix(6)) == tailscalePrefix
+            let isLoopback = bytes.dropLast().allSatisfy { $0 == 0 } && bytes[15] == 1
+            return isTailscale || isLoopback
+        case .name:
+            return false
+        @unknown default:
+            return false
         }
     }
 
@@ -249,7 +363,7 @@ final class ControlServer {
                     status: 400,
                     body: ErrorResponse(
                         ok: false,
-                        error: "Quality must be one of auto, 144p, 240p, 360p, 480p, 720p or 1080p."
+                        error: "Quality must be one of 144p, 240p, 360p, 480p, 720p or 1080p."
                     )
                 )
             }
@@ -449,11 +563,9 @@ private struct ScreenQualityResponse: Codable {
             Date().timeIntervalSince1970
         )
 
-        guard abs(now - timestamp) <= 120 else {
-            return false
-        }
-
-        guard registerNonce(nonce) else {
+        // Compare bounds directly; subtracting an attacker-controlled Int64
+        // and passing it to abs() can overflow and trap before authentication.
+        guard timestamp >= now - 120 && timestamp <= now + 120 else {
             return false
         }
 
@@ -474,14 +586,26 @@ private struct ScreenQualityResponse: Codable {
             using: key
         )
 
-        let expected = Data(digest)
-            .map { String(format: "%02x", $0) }
-            .joined()
+        let hexDigits = Array("0123456789abcdef")
+        var expectedCharacters: [Character] = []
+        expectedCharacters.reserveCapacity(64)
+        for byte in digest {
+            let value = Int(byte)
+            expectedCharacters.append(hexDigits[value >> 4])
+            expectedCharacters.append(hexDigits[value & 0x0F])
+        }
+        let expected = String(expectedCharacters)
 
-        return constantTimeEquals(
+        guard constantTimeEquals(
             signature.lowercased(),
             expected
-        )
+        ) else {
+            return false
+        }
+
+        // Only authenticated requests consume nonce-cache entries. Otherwise
+        // anyone could grow the replay cache with arbitrary unsigned requests.
+        return registerNonce(nonce)
     }
 
     private func registerNonce(_ nonce: String) -> Bool {
@@ -728,77 +852,63 @@ private struct HTTPRequest {
     let body: String
 
     static func parse(_ data: Data) -> HTTPRequest? {
-        guard let text = String(
-            data: data,
-            encoding: .utf8
-        ) else {
-            return nil
-        }
-
-        guard let separator = text.range(
-            of: "\r\n\r\n"
-        ) else {
+        guard data.count <= 80 * 1024,
+              let text = String(data: data, encoding: .utf8),
+              let separator = text.range(of: "\r\n\r\n")
+        else {
             return nil
         }
 
         let head = String(text[..<separator.lowerBound])
         let rawBody = String(text[separator.upperBound...])
+        guard head.utf8.count <= 16 * 1024 else {
+            return nil
+        }
         let lines = head.components(separatedBy: "\r\n")
 
-        guard
-            let line = lines.first,
-            let firstSpace = line.firstIndex(of: " "),
-            let secondSpace = line[
-                line.index(after: firstSpace)...
-            ].firstIndex(of: " ")
+        guard let line = lines.first else {
+            return nil
+        }
+        let requestParts = line.split(separator: " ", omittingEmptySubsequences: true)
+        guard requestParts.count == 3,
+              (requestParts[2] == "HTTP/1.1" || requestParts[2] == "HTTP/1.0")
         else {
             return nil
         }
 
         var headers: [String: String] = [:]
-
         for item in lines.dropFirst() {
             guard let colon = item.firstIndex(of: ":") else {
                 continue
             }
-
             let key = item[..<colon]
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
+                .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
-
             let value = item[item.index(after: colon)...]
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if key == "content-length", headers[key] != nil {
+                return nil
+            }
             headers[key] = value
         }
 
-        let contentLength =
-            Int(headers["content-length"] ?? "0") ?? 0
-
-        guard rawBody.utf8.count >= contentLength else {
+        let rawLength = headers["content-length"] ?? "0"
+        guard let contentLength = Int(rawLength),
+              contentLength >= 0,
+              contentLength <= 64 * 1024,
+              rawBody.utf8.count >= contentLength
+        else {
             return nil
         }
 
-        let bodyBytes = Array(
-            rawBody.utf8.prefix(contentLength)
-        )
-
-        let body = String(
-            bytes: bodyBytes,
-            encoding: .utf8
-        ) ?? ""
+        let bodyBytes = Array(rawBody.utf8.prefix(contentLength))
+        guard let body = String(bytes: bodyBytes, encoding: .utf8) else {
+            return nil
+        }
 
         return HTTPRequest(
-            method: String(line[..<firstSpace]),
-            path: String(
-                line[
-                    line.index(after: firstSpace)..<secondSpace
-                ]
-            ),
+            method: String(requestParts[0]),
+            path: String(requestParts[1]),
             headers: headers,
             body: body
         )

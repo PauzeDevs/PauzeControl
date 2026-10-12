@@ -25,6 +25,7 @@ import org.json.JSONObject;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
 
@@ -61,12 +62,17 @@ public final class MainActivity extends Activity {
     private ScrollView rootScroll;
 
     private TextView navDashboard;
+    private TextView navControls;
     private TextView navActivity;
     private TextView navSettings;
 
     private SecureStore secureStore;
     private ExecutorService executor;
     private boolean macMuted;
+    private boolean activityResumed;
+    private int consecutiveStatusFailures;
+    private final AtomicBoolean automaticStatusRequestInFlight = new AtomicBoolean(false);
+    private static final int STATUS_FAILURES_BEFORE_OFFLINE = 2;
 
     private final Handler mainHandler =
             new Handler(Looper.getMainLooper());
@@ -74,9 +80,13 @@ public final class MainActivity extends Activity {
     private final Runnable statusPoll = new Runnable() {
         @Override
         public void run() {
+            if (!activityResumed || isFinishing()) {
+                return;
+            }
+
             refreshStatus(false);
 
-            if (!isFinishing()) {
+            if (activityResumed && !isFinishing()) {
                 mainHandler.postDelayed(
                         this,
                         5000L
@@ -129,6 +139,7 @@ public final class MainActivity extends Activity {
         volumeSeek = findViewById(R.id.volumeSeek);
 
         navDashboard = findViewById(R.id.navDashboard);
+        navControls = findViewById(R.id.navControls);
         navActivity = findViewById(R.id.navActivity);
         navSettings = findViewById(R.id.navSettings);
         restrictionControl = findViewById(R.id.restrictionCard);
@@ -282,25 +293,50 @@ public final class MainActivity extends Activity {
 
     private void setupNavigation() {
         navDashboard.setOnClickListener(
+                view -> scrollTo(statusCard, navDashboard)
+        );
+
+        navControls.setOnClickListener(
                 view -> scrollTo(
-                        statusCard,
-                        navDashboard
+                        findViewById(R.id.controlsAnchor),
+                        navControls
                 )
         );
 
         navActivity.setOnClickListener(
                 view -> scrollTo(
-                        powerCard,
+                        findViewById(R.id.activityAnchor),
                         navActivity
                 )
         );
 
         navSettings.setOnClickListener(
                 view -> scrollTo(
-                        hostInput,
+                        findViewById(R.id.settingsAnchor),
                         navSettings
                 )
         );
+
+        selectNavigation(navDashboard);
+    }
+
+    private void selectNavigation(TextView selected) {
+        TextView[] items = {
+                navDashboard,
+                navControls,
+                navActivity,
+                navSettings
+        };
+
+        for (TextView item : items) {
+            if (item == selected) {
+                item.setTextColor(WHITE);
+                item.setBackgroundResource(R.drawable.nav_item_selected);
+            } else {
+                item.setTextColor(MUTED);
+                item.setBackgroundResource(R.drawable.nav_item_default);
+            }
+        }
     }
 
     private void scrollTo(
@@ -317,10 +353,7 @@ public final class MainActivity extends Activity {
                 )
         );
 
-        navDashboard.setTextColor(MUTED);
-        navActivity.setTextColor(MUTED);
-        navSettings.setTextColor(MUTED);
-        selected.setTextColor(WHITE);
+        selectNavigation(selected);
 
         selected.animate()
                 .scaleX(1.08f)
@@ -572,42 +605,48 @@ public final class MainActivity extends Activity {
     private void refreshStatus(
             boolean userInitiated
     ) {
-        String host =
-                hostInput.getText()
-                        .toString()
-                        .trim();
+        // The five-second poll must not enqueue more work than the single
+        // executor can service when a host is slow or repeatedly timing out.
+        if (!userInitiated &&
+                !automaticStatusRequestInFlight.compareAndSet(false, true)) {
+            return;
+        }
 
-        executor.execute(
-                () -> {
-                    try {
-                        String token =
-                                secureStore.getToken();
-
-                        if (host.isEmpty() ||
-                                token.isEmpty()) {
-                            if (userInitiated) {
-                                throw new IllegalStateException(
-                                        "Save the connection first."
-                                );
-                            }
-
-                            return;
-                        }
-
-                        requestStatus(
-                                host,
-                                token,
-                                userInitiated
-                        );
-                    } catch (Exception error) {
+        String host = hostInput.getText().toString().trim();
+        try {
+            executor.execute(() -> {
+                try {
+                    String token = secureStore.getToken();
+                    if (host.isEmpty() || token.isEmpty()) {
                         if (userInitiated) {
-                            showError(
-                                    error.getMessage()
+                            throw new IllegalStateException(
+                                    "Save the connection first."
                             );
                         }
+                        return;
+                    }
+
+                    requestStatus(host, token, userInitiated);
+                } catch (Exception error) {
+                    if (userInitiated) {
+                        showError(error.getMessage());
+                    } else {
+                        recordStatusFailure();
+                    }
+                } finally {
+                    if (!userInitiated) {
+                        automaticStatusRequestInFlight.set(false);
                     }
                 }
-        );
+            });
+        } catch (RuntimeException rejected) {
+            if (!userInitiated) {
+                automaticStatusRequestInFlight.set(false);
+                recordStatusFailure();
+            } else {
+                showError(rejected.getMessage());
+            }
+        }
     }
 
     private void requestStatus(
@@ -622,17 +661,17 @@ public final class MainActivity extends Activity {
                         "/v1/status"
                 );
 
-        if (result.code < 200 ||
-                result.code >= 300) {
+        if (result.code < 200 || result.code >= 300) {
             if (showErrors) {
                 throw new IllegalStateException(
-                        "Mac returned HTTP " +
-                                result.code
+                        "Mac returned HTTP " + result.code
                 );
             }
-
+            recordStatusFailure();
             return;
         }
+
+        mainHandler.post(() -> consecutiveStatusFailures = 0);
 
         JSONObject root =
                 new JSONObject(result.body);
@@ -1045,6 +1084,17 @@ public final class MainActivity extends Activity {
         );
     }
 
+    private void recordStatusFailure() {
+        mainHandler.post(() -> {
+            consecutiveStatusFailures++;
+            if (consecutiveStatusFailures >= STATUS_FAILURES_BEFORE_OFFLINE) {
+                statusText.setText("Connection lost • retrying…");
+                connectionPill.setText("● OFFLINE");
+                connectionPill.setTextColor(MUTED);
+            }
+        });
+    }
+
     private void setStatus(
             String message
     ) {
@@ -1125,6 +1175,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        activityResumed = true;
 
         mainHandler.removeCallbacks(
                 statusPoll
@@ -1138,6 +1189,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        activityResumed = false;
         mainHandler.removeCallbacks(
                 statusPoll
         );

@@ -31,7 +31,7 @@ public final class ScreenStreamClient {
     private final Listener listener;
 
     private volatile boolean running;
-    private HttpURLConnection connection;
+    private volatile HttpURLConnection connection;
 
     public ScreenStreamClient(
             String host,
@@ -44,6 +44,10 @@ public final class ScreenStreamClient {
     }
 
     public void start() {
+        if (running) {
+            return;
+        }
+        running = true;
         new Thread(
                 this::run,
                 "PauzeControl-H264"
@@ -52,37 +56,42 @@ public final class ScreenStreamClient {
 
     public void stop() {
         running = false;
-
         HttpURLConnection current = connection;
-
         if (current != null) {
             current.disconnect();
         }
     }
 
     private void run() {
+        HttpURLConnection activeConnection = null;
         try {
-            connection = ApiClient.openScreen(host, token);
+            activeConnection = ApiClient.openScreen(host, token);
+            connection = activeConnection;
 
-            int code = connection.getResponseCode();
+            // stop() may run while the socket is being created; never let
+            // an in-flight connect resurrect a cancelled stream.
+            if (!running) {
+                activeConnection.disconnect();
+                return;
+            }
 
+            int code = activeConnection.getResponseCode();
             if (code < 200 || code >= 300) {
                 throw new IllegalStateException(
                         "Mac returned HTTP " + code
                 );
             }
 
-            running = true;
-            listener.onConnected();
+            if (!running) {
+                return;
+            }
 
-            readStream(
-                    connection.getInputStream()
-            );
+            listener.onConnected();
+            readStream(activeConnection.getInputStream());
 
         } catch (Exception error) {
             if (running) {
                 String message = error.getMessage();
-
                 listener.onError(
                         message == null || message.isEmpty()
                                 ? "H.264 stream failed."
@@ -91,11 +100,13 @@ public final class ScreenStreamClient {
             }
         } finally {
             running = false;
-
-            if (connection != null) {
-                connection.disconnect();
+            HttpURLConnection current = activeConnection;
+            if (current != null) {
+                current.disconnect();
             }
-
+            if (connection == activeConnection) {
+                connection = null;
+            }
             listener.onClosed();
         }
     }

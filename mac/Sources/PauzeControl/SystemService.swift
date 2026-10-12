@@ -170,8 +170,18 @@ enum SystemService {
     }
 
     private static func audio() -> (volume: Int, muted: Bool) {
-        let volume = Int(commandOutput("/usr/bin/osascript", ["-e", "output volume of (get volume settings)"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
-        let muted = commandOutput("/usr/bin/osascript", ["-e", "output muted of (get volume settings)"])?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "true"
+        let script = """
+        set volumeSettings to get volume settings
+        set outputLevel to output volume of volumeSettings
+        set isMuted to output muted of volumeSettings
+        return (outputLevel as string) & "|" & (isMuted as string)
+        """
+        let output = commandOutput("/usr/bin/osascript", ["-e", script]) ?? ""
+        let values = output.components(separatedBy: "|")
+        let volume = values.first
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) } ?? 0
+        let muted = values.count > 1 &&
+            values[1].trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "true"
         return (max(0, min(100, volume)), muted)
     }
 
@@ -188,22 +198,70 @@ enum SystemService {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = output
-        process.standardError = Pipe()
-        do { try process.run() } catch { return nil }
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        // Drain stdout while the child is running; waiting first can deadlock
+        // when a subprocess fills its pipe. A timeout also bounds bad OS calls.
+        let timeout = DispatchWorkItem {
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + 5,
+            execute: timeout
+        )
+        let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        return String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        timeout.cancel()
+
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     private static func run(_ executable: String, _ arguments: [String]) throws {
         let process = Process()
-        let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = pipe
-        do { try process.run(); process.waitUntilExit() }
-        catch { throw NSError(domain: "PauzeControl.System", code: 500, userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start."]) }
-        guard process.terminationStatus == 0 else { throw NSError(domain: "PauzeControl.System", code: 500, userInfo: [NSLocalizedDescriptionKey: "macOS rejected the requested system action."]) }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            throw NSError(
+                domain: "PauzeControl.System",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start."]
+            )
+        }
+
+        let timeout = DispatchWorkItem {
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + 10,
+            execute: timeout
+        )
+        process.waitUntilExit()
+        timeout.cancel()
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "PauzeControl.System",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "macOS rejected or timed out the requested system action."]
+            )
+        }
     }
 }

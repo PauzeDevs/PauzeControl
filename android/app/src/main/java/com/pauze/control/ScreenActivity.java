@@ -49,6 +49,11 @@ public final class ScreenActivity extends Activity
     private boolean streamError;
     private boolean shuttingDown;
     private boolean controlsVisible = true;
+    private boolean qualityConfigured;
+    private boolean qualityRequestInFlight;
+    private boolean manualReconnectRequested;
+    private int reconnectAttempts;
+    private static final long MAX_RECONNECT_DELAY_MS = 30_000L;
 
     private int streamWidth;
     private int streamHeight;
@@ -56,11 +61,10 @@ public final class ScreenActivity extends Activity
     private int decoderWidth;
     private int decoderHeight;
 
-    private String selectedQuality = "auto";
-    private int selectedFPS = 0;
+    private String selectedQuality = "720p";
+    private int selectedFPS = 30;
 
     private static final String[] QUALITY_LABELS = {
-            "Auto • Power Aware",
             "1080p • 60 FPS",
             "1080p • 30 FPS",
             "720p • 60 FPS",
@@ -72,12 +76,12 @@ public final class ScreenActivity extends Activity
     };
 
     private static final String[] QUALITY_VALUES = {
-            "auto", "1080p", "1080p", "720p", "720p",
+            "1080p", "1080p", "720p", "720p",
             "480p", "360p", "240p", "144p"
     };
 
     private static final int[] QUALITY_FPS = {
-            0, 60, 30, 60, 30, 30, 30, 30, 30
+            60, 30, 60, 30, 30, 30, 30, 30
     };
 
     private int frameCount;
@@ -88,6 +92,12 @@ public final class ScreenActivity extends Activity
 
     private final Runnable hideControlsRunnable =
             () -> setControlsVisible(false, true);
+
+    private final Runnable automaticReconnectRunnable = () -> {
+        if (!shuttingDown && surfaceReady && streamClient == null) {
+            startStream();
+        }
+    };
 
     private final MediaCodec.BufferInfo bufferInfo =
             new MediaCodec.BufferInfo();
@@ -113,11 +123,29 @@ public final class ScreenActivity extends Activity
         host = getIntent().getStringExtra("host");
         token = getIntent().getStringExtra("token");
 
+        selectedQuality = getPreferences(MODE_PRIVATE)
+                .getString("screen_quality", "720p");
+        selectedFPS = getPreferences(MODE_PRIVATE)
+                .getInt("screen_fps", 30);
+        if (!("1080p".equals(selectedQuality) ||
+                "720p".equals(selectedQuality) ||
+                "480p".equals(selectedQuality) ||
+                "360p".equals(selectedQuality) ||
+                "240p".equals(selectedQuality) ||
+                "144p".equals(selectedQuality)) ||
+                (selectedFPS == 60 &&
+                        !("1080p".equals(selectedQuality) || "720p".equals(selectedQuality))) ||
+                (selectedFPS != 30 && selectedFPS != 60)) {
+            selectedQuality = "720p";
+            selectedFPS = 30;
+        }
+
         Button closeButton = findViewById(R.id.closeButton);
         Button reconnectButton = findViewById(R.id.reconnectButton);
         Button reconnectBottomButton = findViewById(R.id.reconnectBottomButton);
         Button fullscreenButton = findViewById(R.id.fullscreenButton);
         Button qualityButton = findViewById(R.id.qualityButton);
+        qualityButton.setText(selectedQuality.toUpperCase(Locale.US));
 
         closeButton.setOnClickListener(view -> finish());
         reconnectButton.setOnClickListener(view -> reconnect());
@@ -150,8 +178,10 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        decoderSurface = holder.getSurface();
-        surfaceReady = true;
+        synchronized (this) {
+            decoderSurface = holder.getSurface();
+            surfaceReady = true;
+        }
 
         if (streamClient == null &&
                 host != null && token != null &&
@@ -177,10 +207,13 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        surfaceReady = false;
-        decoderSurface = null;
-        aspectApplied = false;
-        releaseDecoder();
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
+        synchronized (this) {
+            surfaceReady = false;
+            decoderSurface = null;
+            aspectApplied = false;
+            releaseDecoder();
+        }
 
         ScreenStreamClient activeClient = streamClient;
         if (activeClient != null) {
@@ -190,6 +223,11 @@ public final class ScreenActivity extends Activity
 
     private void startStream() {
         if (!surfaceReady || streamClient != null) {
+            return;
+        }
+
+        if (!qualityConfigured) {
+            requestQuality(selectedQuality, selectedFPS);
             return;
         }
 
@@ -210,6 +248,9 @@ public final class ScreenActivity extends Activity
             return;
         }
 
+        reconnectAttempts = 0;
+        manualReconnectRequested = true;
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
         centerControls.setVisibility(View.GONE);
         liveStatus.setText("CONNECTING • H.264");
         resolutionText.setText("VIEW ONLY • H.264");
@@ -225,7 +266,8 @@ public final class ScreenActivity extends Activity
             streamClient = null;
             activeClient.stop();
         } else if (surfaceReady) {
-            screenSurface.postDelayed(this::startStream, 100);
+            manualReconnectRequested = false;
+            screenSurface.postDelayed(automaticReconnectRunnable, 100);
         }
 
         showControlsTemporarily();
@@ -242,7 +284,7 @@ public final class ScreenActivity extends Activity
     }
 
     @Override
-    public void onFrame(
+    public synchronized void onFrame(
             byte[] accessUnit,
             int width,
             int height,
@@ -304,12 +346,25 @@ public final class ScreenActivity extends Activity
                 ByteBuffer input = activeDecoder.getInputBuffer(inputIndex);
 
                 if (input == null) {
+                    // Reset the codec so a dequeued input slot cannot leave
+                    // the decoder in an unrecoverable partially-ready state.
+                    releaseDecoder();
                     return;
                 }
 
                 input.clear();
 
                 if (accessUnit.length > input.remaining()) {
+                    try {
+                        activeDecoder.queueInputBuffer(
+                                inputIndex, 0, 0,
+                                Math.max(0L, ptsMicroseconds), 0
+                        );
+                    } catch (Exception ignored) {
+                        // Resetting below releases the input slot if the
+                        // codec rejects an empty buffer during reconfiguration.
+                    }
+                    releaseDecoder();
                     return;
                 }
 
@@ -475,11 +530,34 @@ public final class ScreenActivity extends Activity
             if (!shuttingDown && surfaceReady &&
                     host != null && token != null &&
                     !host.isEmpty() && !token.isEmpty()) {
-                liveStatus.setText("CONNECTING • H.264");
-                streamInfo.setText("Reconnecting to MacBook Air…");
-                screenSurface.postDelayed(this::startStream, 150);
+                if (manualReconnectRequested) {
+                    manualReconnectRequested = false;
+                    reconnectAttempts = 0;
+                    liveStatus.setText("CONNECTING • H.264");
+                    streamInfo.setText("Reconnecting to MacBook Air…");
+                    screenSurface.removeCallbacks(automaticReconnectRunnable);
+                    screenSurface.postDelayed(automaticReconnectRunnable, 150);
+                } else {
+                    scheduleAutomaticReconnect();
+                }
             }
         });
+    }
+
+    private void scheduleAutomaticReconnect() {
+        if (shuttingDown || !surfaceReady) {
+            return;
+        }
+
+        int attempt = Math.min(reconnectAttempts++, 6);
+        long delay = Math.min(
+                MAX_RECONNECT_DELAY_MS,
+                500L * (1L << attempt)
+        );
+        liveStatus.setText("● RECONNECTING");
+        streamInfo.setText("Retrying in " + (delay / 1000.0) + " seconds…");
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
+        screenSurface.postDelayed(automaticReconnectRunnable, delay);
     }
 
     private void showErrorState(String status) {
@@ -522,26 +600,23 @@ public final class ScreenActivity extends Activity
     }
 
     private String qualitySummary() {
-        if ("auto".equals(selectedQuality)) {
-            return "AUTO • Power aware";
-        }
         return selectedQuality.toUpperCase(Locale.US) +
-                (selectedFPS > 0 ? " • " + selectedFPS + " FPS" : "");
+                " • " + selectedFPS + " FPS";
     }
 
     private void requestQuality(String quality, int fps) {
-        if (host == null || token == null || host.isEmpty() || token.isEmpty()) {
+        if (host == null || token == null || host.isEmpty() || token.isEmpty() ||
+                qualityRequestInFlight) {
             return;
         }
 
+        qualityRequestInFlight = true;
+
         runOnUiThread(() -> {
-            liveStatus.setText("● SWITCHING QUALITY");
+            liveStatus.setText("● APPLYING QUALITY");
             streamInfo.setText(
                     "Applying " + quality.toUpperCase(Locale.US) +
-                            ("auto".equals(quality)
-                                    ? " • AUTO"
-                                    : " • " + fps + " FPS") +
-                            "…"
+                            " • " + fps + " FPS…"
             );
         });
 
@@ -549,10 +624,7 @@ public final class ScreenActivity extends Activity
             try {
                 JSONObject body = new JSONObject();
                 body.put("quality", quality);
-
-                if (!"auto".equals(quality)) {
-                    body.put("fps", fps);
-                }
+                body.put("fps", fps);
 
                 ApiClient.Result result = ApiClient.post(
                         host,
@@ -573,19 +645,34 @@ public final class ScreenActivity extends Activity
 
                 selectedQuality = quality;
                 selectedFPS = fps;
+                getPreferences(MODE_PRIVATE)
+                        .edit()
+                        .putString("screen_quality", quality)
+                        .putInt("screen_fps", fps)
+                        .apply();
+                qualityConfigured = true;
 
                 runOnUiThread(() -> {
+                    qualityRequestInFlight = false;
                     Button qualityButton = findViewById(R.id.qualityButton);
-                    qualityButton.setText(
-                            "auto".equals(quality)
-                                    ? "AUTO"
-                                    : quality.toUpperCase(Locale.US)
-                    );
+                    qualityButton.setText(quality.toUpperCase(Locale.US));
                     liveStatus.setText("● RECONNECTING • H.264");
                     streamInfo.setText("MacBook Air • View only • " + qualitySummary());
+                    if (surfaceReady && streamClient == null) {
+                        startStream();
+                    }
                 });
             } catch (Exception error) {
-                showErrorState("● QUALITY ERROR");
+                runOnUiThread(() -> {
+                    qualityRequestInFlight = false;
+                    liveStatus.setText("● QUALITY ERROR");
+                    String message = error.getMessage();
+                    streamInfo.setText(message == null || message.isEmpty()
+                            ? "Unable to apply the selected quality."
+                            : message);
+                    centerControls.setVisibility(View.VISIBLE);
+                    showControlsTemporarily();
+                });
             }
         }, "PauzeControl-Quality").start();
     }
@@ -640,7 +727,7 @@ public final class ScreenActivity extends Activity
         }
     }
 
-    private void releaseDecoder() {
+    private synchronized void releaseDecoder() {
         MediaCodec activeDecoder = decoder;
         decoder = null;
         decoderWidth = 0;
@@ -738,17 +825,21 @@ public final class ScreenActivity extends Activity
 
     @Override
     protected void onDestroy() {
-        shuttingDown = true;
-        surfaceReady = false;
+        screenSurface.removeCallbacks(automaticReconnectRunnable);
         uiHandler.removeCallbacksAndMessages(null);
 
-        ScreenStreamClient activeClient = streamClient;
-        if (activeClient != null) {
-            activeClient.stop();
+        synchronized (this) {
+            shuttingDown = true;
+            surfaceReady = false;
+            decoderSurface = null;
+            ScreenStreamClient activeClient = streamClient;
+            streamClient = null;
+            if (activeClient != null) {
+                activeClient.stop();
+            }
+            releaseDecoder();
         }
 
-        streamClient = null;
-        releaseDecoder();
         super.onDestroy();
     }
 }
