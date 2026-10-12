@@ -18,6 +18,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 public final class ApiClient {
     private static final int PAUZE_PORT = 47777;
+    private static final SecureRandom NONCE_RANDOM = new SecureRandom();
+    private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
 
     public static final class Result {
         public final int code;
@@ -109,17 +111,23 @@ public final class ApiClient {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         byte[] digest = mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8));
-        StringBuilder result = new StringBuilder(digest.length * 2);
-        for (byte item : digest) result.append(String.format(Locale.US, "%02x", item & 0xff));
-        return result.toString();
+        return toHex(digest);
     }
 
     private static String randomHex(int byteCount) {
         byte[] value = new byte[byteCount];
-        new SecureRandom().nextBytes(value);
-        StringBuilder result = new StringBuilder(byteCount * 2);
-        for (byte item : value) result.append(String.format(Locale.US, "%02x", item & 0xff));
-        return result.toString();
+        NONCE_RANDOM.nextBytes(value);
+        return toHex(value);
+    }
+
+    private static String toHex(byte[] value) {
+        char[] output = new char[value.length * 2];
+        for (int index = 0; index < value.length; index++) {
+            int unsigned = value[index] & 0xff;
+            output[index * 2] = HEX_DIGITS[unsigned >>> 4];
+            output[index * 2 + 1] = HEX_DIGITS[unsigned & 0x0f];
+        }
+        return new String(output);
     }
 
     public static boolean restricted(String body) {
