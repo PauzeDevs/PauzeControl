@@ -51,45 +51,61 @@ public final class ApiClient {
     }
 
     private static Result request(String host, String token, String method, String path, String body) throws Exception {
-        URI uri = buildUri(host, path);
-        HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
-        configure(connection, token, method, path, body);
-        connection.setReadTimeout(5000);
+        HttpURLConnection connection = (HttpURLConnection) buildUri(host, path).toURL().openConnection();
+        try {
+            configure(connection, token, method, path, body);
+            connection.setReadTimeout(5000);
 
-        if ("POST".equals(method)) {
-            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Content-Length", Integer.toString(payload.length));
-            try (OutputStream output = connection.getOutputStream()) { output.write(payload); }
-        }
-
-        int code = connection.getResponseCode();
-        java.io.InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
-        StringBuilder result = new StringBuilder();
-        if (stream != null) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) result.append(line);
+            if ("POST".equals(method)) {
+                byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Content-Length", Integer.toString(payload.length));
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(payload);
+                }
             }
+
+            int code = connection.getResponseCode();
+            java.io.InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            StringBuilder result = new StringBuilder();
+            if (stream != null) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        result.append(line);
+                    }
+                }
+            }
+            return new Result(code, result.toString());
+        } finally {
+            connection.disconnect();
         }
-        connection.disconnect();
-        return new Result(code, result.toString());
     }
 
-    private static URI buildUri(String host, String path) {
+    private static URI buildUri(String host, String path) throws Exception {
         String normalized = host.trim();
-        if (normalized.isEmpty()) throw new IllegalArgumentException("Mac address is empty.");
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("Mac address is empty.");
+        }
         if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
             normalized = "http://" + normalized;
         }
-        while (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
 
         URI base = URI.create(normalized);
-        if (base.getPort() == -1) {
-            normalized = normalized + ":" + PAUZE_PORT;
+        String scheme = base.getScheme();
+        if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) ||
+                base.getHost() == null || base.getRawUserInfo() != null ||
+                base.getRawQuery() != null || base.getRawFragment() != null) {
+            throw new IllegalArgumentException("Enter a valid Mac hostname or IP address.");
         }
-        return URI.create(normalized + path);
+        String basePath = base.getRawPath();
+        if (basePath != null && !basePath.isEmpty() && !"/".equals(basePath)) {
+            throw new IllegalArgumentException("Enter only the Mac hostname or IP address, without a path.");
+        }
+
+        int port = base.getPort() == -1 ? PAUZE_PORT : base.getPort();
+        return new URI(scheme, null, base.getHost(), port, path, null, null);
     }
 
     private static void configure(HttpURLConnection connection, String token, String method, String path, String body) throws Exception {
