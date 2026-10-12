@@ -249,7 +249,7 @@ final class ControlServer {
                     status: 400,
                     body: ErrorResponse(
                         ok: false,
-                        error: "Quality must be one of auto, 144p, 240p, 360p, 480p, 720p or 1080p."
+                        error: "Quality must be one of 144p, 240p, 360p, 480p, 720p or 1080p."
                     )
                 )
             }
