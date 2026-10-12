@@ -61,8 +61,10 @@ jobs:
           if-no-files-found: error
 
       - name: Publish visible GitHub pre-release
+        if: ${{ secrets.GH_RELEASE_TOKEN != '' }}
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GH_RELEASE_TOKEN }}
           tag_name: v1.3.0-rc.1
           target_commitish: ${{ github.sha }}
           name: PauzeControl v1.3.0 RC1 — Android Preview
@@ -94,3 +96,10 @@ jobs:
 
             ## Stable release
             The signed stable release workflow requires the maintained release keystore. The repository Actions signing secrets must be configured before a final stable APK can be built. Do not treat this preview APK as the stable production package.
+
+      - name: Explain why the release page was not published
+        if: ${{ secrets.GH_RELEASE_TOKEN == '' }}
+        run: |
+          echo "::warning::APK built and verified, but GitHub rejected release creation with the workflow token."
+          echo "Configure a fine-grained PAT as the GH_RELEASE_TOKEN repository Actions secret."
+          echo "Required repository permission: Contents (read and write). Then re-run this workflow to publish v1.3.0-rc.1."
