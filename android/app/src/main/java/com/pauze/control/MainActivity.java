@@ -68,6 +68,9 @@ public final class MainActivity extends Activity {
     private SecureStore secureStore;
     private ExecutorService executor;
     private boolean macMuted;
+    private boolean activityResumed;
+    private int consecutiveStatusFailures;
+    private static final int STATUS_FAILURES_BEFORE_OFFLINE = 2;
 
     private final Handler mainHandler =
             new Handler(Looper.getMainLooper());
@@ -75,9 +78,13 @@ public final class MainActivity extends Activity {
     private final Runnable statusPoll = new Runnable() {
         @Override
         public void run() {
+            if (!activityResumed || isFinishing()) {
+                return;
+            }
+
             refreshStatus(false);
 
-            if (!isFinishing()) {
+            if (activityResumed && !isFinishing()) {
                 mainHandler.postDelayed(
                         this,
                         5000L
@@ -625,9 +632,9 @@ public final class MainActivity extends Activity {
                         );
                     } catch (Exception error) {
                         if (userInitiated) {
-                            showError(
-                                    error.getMessage()
-                            );
+                            showError(error.getMessage());
+                        } else {
+                            recordStatusFailure();
                         }
                     }
                 }
@@ -646,17 +653,17 @@ public final class MainActivity extends Activity {
                         "/v1/status"
                 );
 
-        if (result.code < 200 ||
-                result.code >= 300) {
+        if (result.code < 200 || result.code >= 300) {
             if (showErrors) {
                 throw new IllegalStateException(
-                        "Mac returned HTTP " +
-                                result.code
+                        "Mac returned HTTP " + result.code
                 );
             }
-
+            recordStatusFailure();
             return;
         }
+
+        mainHandler.post(() -> consecutiveStatusFailures = 0);
 
         JSONObject root =
                 new JSONObject(result.body);
@@ -1069,6 +1076,17 @@ public final class MainActivity extends Activity {
         );
     }
 
+    private void recordStatusFailure() {
+        mainHandler.post(() -> {
+            consecutiveStatusFailures++;
+            if (consecutiveStatusFailures >= STATUS_FAILURES_BEFORE_OFFLINE) {
+                statusText.setText("Connection lost • retrying…");
+                connectionPill.setText("● OFFLINE");
+                connectionPill.setTextColor(MUTED);
+            }
+        });
+    }
+
     private void setStatus(
             String message
     ) {
@@ -1149,6 +1167,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        activityResumed = true;
 
         mainHandler.removeCallbacks(
                 statusPoll
@@ -1162,6 +1181,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        activityResumed = false;
         mainHandler.removeCallbacks(
                 statusPoll
         );
