@@ -474,9 +474,15 @@ private struct ScreenQualityResponse: Codable {
             using: key
         )
 
-        let expected = Data(digest)
-            .map { String(format: "%02x", $0) }
-            .joined()
+        let hexDigits = Array("0123456789abcdef")
+        var expectedCharacters: [Character] = []
+        expectedCharacters.reserveCapacity(64)
+        for byte in digest {
+            let value = Int(byte)
+            expectedCharacters.append(hexDigits[value >> 4])
+            expectedCharacters.append(hexDigits[value & 0x0F])
+        }
+        let expected = String(expectedCharacters)
 
         return constantTimeEquals(
             signature.lowercased(),
