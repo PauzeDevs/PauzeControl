@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/rootScroll"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@drawable/bg_screen"
+    android:fitsSystemWindows="true">
+
+    <ScrollView
+        android:id="@+id/rootScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/transparent"
     android:clipToPadding="false"
     android:fillViewport="true"
     android:fitsSystemWindows="true"
@@ -66,51 +75,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/navBar"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="18dp"
-            android:background="@drawable/card_status"
-            android:gravity="center_vertical"
-            android:padding="4dp">
 
-            <TextView
-                android:id="@+id/navDashboard"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="HOME"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.06" />
-
-            <TextView
-                android:id="@+id/navActivity"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="ACTIVITY"
-                android:textColor="#737988"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.06" />
-
-            <TextView
-                android:id="@+id/navSettings"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="SETTINGS"
-                android:textColor="#737988"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.06" />
-        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -371,6 +336,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/controlsAnchor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
@@ -706,4 +672,79 @@
             android:letterSpacing="0.06" />
 
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/navBar"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/card_status"
+        android:gravity="center_vertical"
+        android:padding="5dp">
+
+        <TextView
+            android:id="@+id/navDashboard"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/nav_item_selected"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:text="HOME"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/navControls"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:text="CONTROL"
+            android:textColor="#737988"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.03"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/navActivity"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:text="ACTIVITY"
+            android:textColor="#737988"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.03"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/navSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:text="SETTINGS"
+            android:textColor="#737988"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.03"
+            android:clickable="true"
+            android:focusable="true" />
+    </LinearLayout>
+</LinearLayout>
