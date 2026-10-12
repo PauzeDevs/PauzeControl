@@ -218,7 +218,11 @@ final class ControlServer {
         guard receivedBodyLength <= maximumBodyBytes else {
             return true
         }
-        if let parsedLength, receivedBodyLength > parsedLength {
+        if let parsedLength {
+            if receivedBodyLength > parsedLength {
+                return true
+            }
+        } else if receivedBodyLength > 0 {
             return true
         }
         return false
@@ -565,10 +569,6 @@ private struct ScreenQualityResponse: Codable {
             return false
         }
 
-        guard registerNonce(nonce) else {
-            return false
-        }
-
         let canonical = [
             String(timestamp),
             nonce,
@@ -596,10 +596,16 @@ private struct ScreenQualityResponse: Codable {
         }
         let expected = String(expectedCharacters)
 
-        return constantTimeEquals(
+        guard constantTimeEquals(
             signature.lowercased(),
             expected
-        )
+        ) else {
+            return false
+        }
+
+        // Only authenticated requests consume nonce-cache entries. Otherwise
+        // anyone could grow the replay cache with arbitrary unsigned requests.
+        return registerNonce(nonce)
     }
 
     private func registerNonce(_ nonce: String) -> Bool {
