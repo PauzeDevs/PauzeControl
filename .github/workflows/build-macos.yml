@@ -17,6 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           swift package dump-package
+          swift build -c debug
           find Sources -type f -name '*.swift' -print0 |
             while IFS= read -r -d '' file; do
               swiftc -parse "$file"
