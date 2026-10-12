@@ -1,11 +1,9 @@
-name: PauzeControl v1.3.0 Android Release
+name: PauzeControl v1.3.0 Debug APK Release
 
 on:
   push:
     branches:
       - 'release/**'
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -13,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build signed PauzeControl APK
+    name: Build and publish debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -36,51 +34,56 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Validate and decode release signing key
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret."; exit 1; }
-          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD repository secret."; exit 1; }
-          test -n "$ANDROID_KEY_ALIAS" || { echo "Missing ANDROID_KEY_ALIAS repository secret."; exit 1; }
-          test -n "$ANDROID_KEY_PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD repository secret."; exit 1; }
-          KEYSTORE_PATH="$RUNNER_TEMP/pauze-release.jks"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          test -s "$KEYSTORE_PATH"
-          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
-          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-
-      - name: Build signed release APK
+      - name: Build debug APK
         working-directory: android
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: gradle clean assembleRelease --no-daemon
+        run: gradle clean assembleDebug --no-daemon
 
-      - name: Verify release APK is signed
+      - name: Verify APK archive
         run: |
           set -euo pipefail
-          APK="android/app/build/outputs/apk/release/app-release.apk"
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose "$APK"
+          unzip -t "$APK"
 
-      - name: Upload signed APK artifact
+      - name: Prepare release APK filename
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk PauzeControl-v1.3.0-debug.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PauzeControl-Android
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: PauzeControl-v1.3.0-debug
+          path: PauzeControl-v1.3.0-debug.apk
           if-no-files-found: error
 
-      - name: Attach signed APK to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish GitHub release with debug APK
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/app-release.apk
-          generate_release_notes: false
+          tag_name: v1.3.0
+          name: PauzeControl v1.3.0
+          body: |
+            ## PauzeControl v1.3.0 — Android Debug Release
+
+            This GitHub release distributes the **debug APK** for direct installation and testing. It is not a Google Play Store release.
+
+            ### Included
+            - Updated Android control-center UI with Home, Control, Activity, and Settings navigation.
+            - Manual video quality options; default 720p at 30 FPS.
+            - Android icon and app presentation updates.
+            - Security and request-validation fixes documented in `AUDIT_REPORT.md`.
+            - Updated README and complete build instructions in `docs/BUILD_NOTES.md`.
+
+            ### Install
+            1. Download `PauzeControl-v1.3.0-debug.apk` from Assets below.
+            2. On Android, allow installation from this source if prompted.
+            3. Install and open the APK.
+
+            ### Important
+            - This is a debug build, intended for testing and direct distribution.
+            - It is not a Play Store release and is not a signed production build.
+            - Keep the Android app paired only with a trusted Mac host and configured private network.
+
+            See `docs/RELEASE_NOTES_v1.3.0.md` and `docs/BUILD_NOTES.md` for details.
+          draft: false
+          prerelease: false
+          files: PauzeControl-v1.3.0-debug.apk
+          fail_on_unmatched_files: true
