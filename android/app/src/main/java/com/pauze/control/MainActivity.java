@@ -9,12 +9,14 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -22,6 +24,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +45,9 @@ public final class MainActivity extends Activity {
     private TextView macStateText;
     private TextView macNameText;
     private TextView connectionPill;
+    private TextView activityEmptyTitle;
+    private TextView activityEmptyDetail;
+    private LinearLayout activityTimeline;
 
     private TextView cpuValue;
     private TextView memoryValue;
@@ -136,6 +143,9 @@ public final class MainActivity extends Activity {
         macStateText = findViewById(R.id.macStateText);
         macNameText = findViewById(R.id.macNameText);
         connectionPill = findViewById(R.id.connectionPill);
+        activityEmptyTitle = findViewById(R.id.activityTitle);
+        activityEmptyDetail = findViewById(R.id.activityDetail);
+        activityTimeline = findViewById(R.id.activityTimeline);
 
         cpuValue = findViewById(R.id.cpuValue);
         memoryValue = findViewById(R.id.memoryValue);
@@ -700,6 +710,14 @@ public final class MainActivity extends Activity {
         setStatus(
                 "Live • synced with your Mac"
         );
+
+        if (showErrors) {
+            recordActivity(
+                    "Connection verified",
+                    "Secure connection to " + host,
+                    true
+            );
+        }
     }
 
     private void updateState(
@@ -945,12 +963,23 @@ public final class MainActivity extends Activity {
                             );
                         }
 
+                        recordActivity(
+                                "Remote command completed",
+                                commandDescription(endpoint),
+                                true
+                        );
+
                         mainHandler.postDelayed(
                                 () -> refreshStatus(false),
                                 250L
                         );
 
                     } catch (Exception error) {
+                        recordActivity(
+                                "Remote command failed",
+                                error.getMessage(),
+                                false
+                        );
                         showError(
                                 error.getMessage()
                         );
@@ -1007,8 +1036,18 @@ public final class MainActivity extends Activity {
                                         volume +
                                         "%."
                         );
+                        recordActivity(
+                                "Volume updated",
+                                "Mac output volume set to " + volume + "%",
+                                true
+                        );
 
                     } catch (Exception error) {
+                        recordActivity(
+                                "Volume update failed",
+                                error.getMessage(),
+                                false
+                        );
                         showError(
                                 error.getMessage()
                         );
@@ -1092,11 +1131,113 @@ public final class MainActivity extends Activity {
         mainHandler.post(() -> {
             consecutiveStatusFailures++;
             if (consecutiveStatusFailures >= STATUS_FAILURES_BEFORE_OFFLINE) {
+                if (consecutiveStatusFailures == STATUS_FAILURES_BEFORE_OFFLINE) {
+                    recordActivity(
+                            "Connection lost",
+                            "Unable to reach the Mac. Retrying automatically.",
+                            false
+                    );
+                }
                 statusText.setText("Connection lost • retrying…");
                 connectionPill.setText("● OFFLINE");
                 connectionPill.setTextColor(MUTED);
             }
         });
+    }
+
+    private String commandDescription(String endpoint) {
+        switch (endpoint) {
+            case "/v1/restrict": return "Mac restriction enabled";
+            case "/v1/allow": return "Mac restriction disabled";
+            case "/v1/lock": return "Mac locked";
+            case "/v1/sleep": return "Sleep command sent";
+            case "/v1/restart": return "Restart command sent";
+            case "/v1/shutdown": return "Shutdown command sent";
+            case "/v1/mute": return "Mac audio muted";
+            case "/v1/unmute": return "Mac audio unmuted";
+            default: return "Command sent to the Mac";
+        }
+    }
+
+    private void recordActivity(
+            String title,
+            String detail,
+            boolean successful
+    ) {
+        mainHandler.post(() -> {
+            if (activityTimeline == null) {
+                return;
+            }
+
+            activityEmptyTitle.setVisibility(View.GONE);
+            activityEmptyDetail.setVisibility(View.GONE);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(13), dp(11), dp(13), dp(11));
+            row.setBackgroundResource(R.drawable.card_metric);
+
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+            rowParams.topMargin = dp(8);
+
+            LinearLayout heading = new LinearLayout(this);
+            heading.setOrientation(LinearLayout.HORIZONTAL);
+            heading.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            TextView titleView = new TextView(this);
+            titleView.setText(title);
+            titleView.setTextColor(Color.parseColor(
+                    successful ? "#72E6B2" : "#FF9292"
+            ));
+            titleView.setTextSize(12);
+            titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            titleView.setMaxLines(2);
+
+            LinearLayout.LayoutParams titleParams =
+                    new LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f
+                    );
+            heading.addView(titleView, titleParams);
+
+            TextView timeView = new TextView(this);
+            timeView.setText(new SimpleDateFormat(
+                    "HH:mm:ss",
+                    Locale.getDefault()
+            ).format(new Date()));
+            timeView.setTextColor(Color.parseColor("#7F8DA4"));
+            timeView.setTextSize(10);
+            heading.addView(timeView);
+
+            TextView detailView = new TextView(this);
+            detailView.setText(detail == null || detail.trim().isEmpty()
+                    ? "No additional details"
+                    : detail);
+            detailView.setTextColor(Color.parseColor("#B5C0D1"));
+            detailView.setTextSize(11);
+            detailView.setPadding(0, dp(5), 0, 0);
+
+            row.addView(heading);
+            row.addView(detailView);
+            activityTimeline.addView(row, 0, rowParams);
+
+            while (activityTimeline.getChildCount() > 12) {
+                activityTimeline.removeViewAt(
+                        activityTimeline.getChildCount() - 1
+                );
+            }
+        });
+    }
+
+    private int dp(float value) {
+        return Math.round(
+                value * getResources().getDisplayMetrics().density
+        );
     }
 
     private void setStatus(
