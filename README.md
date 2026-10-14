@@ -4,7 +4,9 @@
 
 PauzeControl consists of an Android controller and a native macOS agent. They communicate directly over a private Tailscale network; the project does not require a hosted control backend.
 
-> **Downloads:** [PauzeControl v1.3.0 APK (debug build)](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.3.0/PauzeControl-v1.3.0-debug.apk) · [v1.3.0 GitHub release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0) · [v1.3.0 RC1 preview](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0-rc.1).\n>\n> **Important:** these published APKs are debug-signed testing builds, not the final stable production-signed APK. The stable signing workflow requires a maintained release keystore and configured GitHub Actions secrets. See [Build notes](docs/BUILD_NOTES.md).
+> **Downloads:** [PauzeControl v1.4.0 Debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.4.0-beta.1/PauzeControl-v1.4.0-debug.apk) · [v1.4.0 Stable GitHub release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0) · [v1.4.0 Beta release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0-beta.1).
+>
+> **Signing:** Both channel APKs are debug-signed direct GitHub downloads. The stable channel is not a production-signed or Google Play release. See [Build notes](docs/BUILD_NOTES.md).
 
 ## Features
 
@@ -20,7 +22,7 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 - Hardware-accelerated H.264 encoding using VideoToolbox.
 - Android hardware decoding through MediaCodec.
 - Full-screen viewer with a manual quality selector and reconnect controls.
-- Aspect-ratio-preserving video presentation; the view is read-only.
+- Aspect-ratio-preserving viewer with separate read-only VIEW and interactive CONTROL modes.
 
 Manual quality targets:
 
@@ -70,9 +72,9 @@ Use only on devices you own or are explicitly authorized to administer.
 The project has separate CI workflows for:
 - Android debug builds (Build Android).
 - macOS package build/type-check plus Swift syntax checks (Validate macOS).
-- Signed Android release APKs (Android APK), triggered by a v-prefixed tag or manual workflow dispatch.
+- Android beta/debug and stable GitHub channel APKs, triggered by the `v1.4.0` release tag. Both are currently debug-signed; production release signing requires the project’s private release keystore.
 
-The signed release workflow requires four repository Actions secrets. Setup and exact commands are documented in **[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)**. A green debug build alone does not mean a signed release APK has been generated.
+A green debug build does not mean a production-signed APK has been generated. Signing setup and release limitations are documented in **[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)**.
 
 ## Security model and limitations
 

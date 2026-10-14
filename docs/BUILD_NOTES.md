@@ -1,14 +1,14 @@
-# PauzeControl v1.3.0 — Complete Build Notes
+# PauzeControl — Build and Release Notes
 
-These instructions build the Android controller and macOS agent from source. They also cover producing and verifying a **signed Android release APK**.
+These instructions build the Android controller and macOS agent from source. They also cover producing and verifying Android APKs.
 
 ## Release identity
 
-> **Current downloads:** [v1.3.0 debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.3.0/PauzeControl-v1.3.0-debug.apk) · [v1.3.0 release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0) · [v1.3.0 RC1 preview](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.3.0-rc.1). These APKs are debug-signed testing builds, not the final stable production-signed APK.
+> **Current downloads:** [v1.4.0 Debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.4.0-beta.1/PauzeControl-v1.4.0-debug.apk) · [v1.4.0 Stable GitHub release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0) · [v1.4.0 Beta release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0-beta.1). Both channel APKs are debug-signed GitHub distributions, not production-signed Play Store packages.
 
 - Android application ID: com.pauze.control
-- Release version name: 1.3.0
-- Release version code: 2
+- Release version name: 1.4.0
+- Release version code: 4
 - Android minimum API: 26 (Android 8.0)
 - Android target/compile API: 35
 - Java toolchain: 17
@@ -53,7 +53,7 @@ adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-A debug APK is intended for development and testing, not as the stable distribution artifact.
+The current stable GitHub channel is also debug-signed; it is not a production-signed distribution. A separately configured release keystore is required before publishing a production-signed APK.
 
 ## Android signed release build
 
@@ -140,7 +140,7 @@ base64 < "$HOME/.keys/pauze-release.jks" | tr -d '\n'
 
 Copy that output directly into the ANDROID_KEYSTORE_BASE64 secret. Do not add the keystore itself to the repository or paste passwords into workflow YAML.
 
-The CI workflow decodes the keystore into the runner's temporary directory, confirms the alias can be read, builds the release APK, runs apksigner verification, and uploads the verified APK as the PauzeControl-Android Actions artifact. When the workflow is triggered by a tag such as v1.3.0, it also attaches the APK to that GitHub Release.
+The current v1.4.0 channel workflow builds and verifies a debug APK, then publishes separate beta/debug and stable GitHub channel releases from the same build. Both APKs are debug-signed. It does not decode the production release keystore or create a production-signed APK.
 
 If one of the secrets is missing or invalid, the workflow intentionally fails instead of quietly shipping an unsigned artifact. The repository maintainer must create/configure the release secrets; repository code cannot safely create or retrieve them.
 
@@ -192,7 +192,7 @@ The agent accepts Tailscale IPv4 addresses in 100.64.0.0/10, Tailscale IPv6 addr
 |---|---|---|
 | Build Android | Runs Gradle assembleDebug on pushes and pull requests | Debug APK artifact |
 | Validate macOS | Runs swift package dump-package, swift build -c debug, per-file Swift parse, and Android tree presence check | Type-checked Swift package and syntax validation |
-| Android APK | Builds a signed release APK on a v-prefixed tag or manually | Verified release APK artifact; GitHub Release attachment for v-prefixed tags |
+| Android APK releases | Builds and verifies a debug APK on the `v1.4.0` tag | Separate beta/debug and stable GitHub channel releases; both assets are debug-signed |
 
 The CI build validates source/buildability but cannot prove live screen capture, Tailscale routing, macOS privacy permissions, codec stability, or OS power commands work on every device. Complete the smoke tests below before calling a build production-stable.
 
@@ -219,7 +219,7 @@ The CI build validates source/buildability but cannot prove live screen capture,
 
 **Release signing fails:** confirm that all four environment variables are set, the path is absolute, the key alias exists, and passwords correspond to the same keystore.
 
-**GitHub release workflow stops at secret validation:** configure the repository Actions secrets listed above; there is no safe code fallback for missing signing credentials.
+**Stable channel is not production-signed:** the v1.4.0 workflow publishes debug-signed GitHub channel APKs. A production-signed stable package requires a persistent release keystore and a separate reviewed release workflow.
 
 **APK update is rejected:** Android requires a matching signing certificate for in-place updates. Use the original keystore. If the APK was signed with a different key, it cannot update the installed package in place.
 
@@ -237,4 +237,4 @@ When distributing a release, record:
 - Signing certificate digest (from apksigner output; never record the private key/password)
 - Device/OS versions and smoke-test results
 
-This repository currently defines v1.3.0 / versionCode 2. Update the versionCode for every future release that needs to install as an update.
+The current Android release is v1.4.0 / versionCode 4. Update the versionCode for every future release that needs to install as an update.
