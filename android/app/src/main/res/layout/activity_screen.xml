@@ -165,6 +165,31 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/controlModeButton"
+            android:layout_width="60dp"
+            android:layout_height="44dp"
+            android:background="@drawable/card_status"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginEnd="4dp"
+            android:text="VIEW"
+            android:textColor="#FFFFFF"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/typeTextButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="⌨"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:contentDescription="Type text on Mac" />
+
+        <Button
             android:id="@+id/fullscreenButton"
             android:layout_width="44dp"
             android:layout_height="44dp"

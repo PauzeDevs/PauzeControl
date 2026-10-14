@@ -393,6 +393,31 @@ final class ControlServer {
                 )
             )
 
+        case ("POST", "/v1/screen/input"):
+            guard
+                let bodyData = request.body.data(using: .utf8),
+                let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                let action = object["action"] as? String
+            else {
+                return HTTPResponse.json(
+                    status: 400,
+                    body: RemoteInputResponse(ok: false, error: "Invalid remote input request.")
+                )
+            }
+
+            do {
+                try RemoteInput.perform(action: action, payload: object)
+                return HTTPResponse.json(
+                    status: 200,
+                    body: RemoteInputResponse(ok: true, error: nil)
+                )
+            } catch {
+                return HTTPResponse.json(
+                    status: 400,
+                    body: RemoteInputResponse(ok: false, error: error.localizedDescription)
+                )
+            }
+
         case ("GET", "/v1/status"):
             return HTTPResponse.json(
                 status: 200,
@@ -515,6 +540,11 @@ private struct ScreenQualityResponse: Codable {
     let ok: Bool
     let quality: String
     let fps: Int
+}
+
+private struct RemoteInputResponse: Codable {
+    let ok: Bool
+    let error: String?
 }
 
     private func executeSystemCommand(

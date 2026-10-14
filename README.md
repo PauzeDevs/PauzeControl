@@ -38,6 +38,7 @@ The selected target is sent to the Mac and persisted on Android. Battery level d
 - Pairing secret stored in the macOS Keychain; Android stores its copy through Android Keystore-backed AES-GCM encryption.
 - System telemetry for CPU, memory, disk, battery, uptime, macOS version, and audio state.
 - Optional restriction overlay and input event tap, subject to macOS permissions.
+- Live Screen offers view-only and interactive modes; interactive mode supports taps, swipe scrolling, long-press dragging, and typed text. macOS Accessibility permission is required for remote input.
 
 ## Requirements
 

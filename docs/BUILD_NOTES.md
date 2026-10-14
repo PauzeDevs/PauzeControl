@@ -151,7 +151,7 @@ If one of the secrets is missing or invalid, the workflow intentionally fails in
 - macOS 14 or later
 - Xcode Command Line Tools and the Swift toolchain
 - Screen Recording permission for the live stream
-- Accessibility/Input Monitoring permission may be required for restriction/input blocking
+- Accessibility permission is required for interactive Live Screen input; Input Monitoring may be required for restriction/input blocking
 - A connected Tailscale network for Android-to-Mac communication
 
 Verify Swift is available:
@@ -180,7 +180,7 @@ The macOS process is a native agent, not the Android APK. Build and install it o
 
 1. Open macOS System Settings → Privacy & Security.
 2. Allow Screen Recording for PauzeControl if live screen capture is required.
-3. Grant Accessibility/Input Monitoring only when required by the restriction functionality.
+3. Grant Accessibility to PauzeControl when using Live Screen's CONTROL mode; the agent requests this permission when the first remote input arrives. Grant Input Monitoring only when required by restriction functionality.
 4. Restart PauzeControl after changing Screen Recording permission.
 5. Confirm both devices are connected to Tailscale.
 

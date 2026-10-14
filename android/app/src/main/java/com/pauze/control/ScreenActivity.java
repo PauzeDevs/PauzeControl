@@ -11,6 +11,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.FrameLayout;
+import android.widget.EditText;
+import android.widget.Toast;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -51,6 +53,12 @@ public final class ScreenActivity extends Activity
     private boolean controlsVisible = true;
     private boolean qualityConfigured;
     private boolean qualityRequestInFlight;
+    private boolean controlMode;
+    private volatile boolean hasReceivedVideoPacket;
+    private float touchStartX;
+    private float touchStartY;
+    private long touchStartTime;
+    private boolean touchMoved;
     private boolean manualReconnectRequested;
     private int reconnectAttempts;
     private static final long MAX_RECONNECT_DELAY_MS = 30_000L;
@@ -92,6 +100,13 @@ public final class ScreenActivity extends Activity
 
     private final Runnable hideControlsRunnable =
             () -> setControlsVisible(false, true);
+
+    private final Runnable noVideoFrameRunnable = () -> {
+        if (!shuttingDown && !hasReceivedVideoPacket && streamClient != null) {
+            liveStatus.setText("CONNECTED • NO VIDEO");
+            streamInfo.setText("Check Screen Recording permission and Mac agent logs.");
+        }
+    };
 
     private final Runnable automaticReconnectRunnable = () -> {
         if (!shuttingDown && surfaceReady && streamClient == null) {
@@ -145,7 +160,16 @@ public final class ScreenActivity extends Activity
         Button reconnectBottomButton = findViewById(R.id.reconnectBottomButton);
         Button fullscreenButton = findViewById(R.id.fullscreenButton);
         Button qualityButton = findViewById(R.id.qualityButton);
+        Button controlModeButton = findViewById(R.id.controlModeButton);
+        Button typeTextButton = findViewById(R.id.typeTextButton);
+        typeTextButton.setEnabled(false);
         qualityButton.setText(selectedQuality.toUpperCase(Locale.US));
+        controlModeButton.setOnClickListener(view -> {
+            controlMode = !controlMode;
+            updateControlModeUi();
+            showControlsTemporarily();
+        });
+        typeTextButton.setOnClickListener(view -> showTextInput());
 
         closeButton.setOnClickListener(view -> finish());
         reconnectButton.setOnClickListener(view -> reconnect());
@@ -156,7 +180,9 @@ public final class ScreenActivity extends Activity
         // Tapping the video behaves like a modern video player: controls
         // appear briefly, then fade away so the Mac screen gets the focus.
         screenSurface.setOnTouchListener((view, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (controlMode) {
+                handleControlTouch(event, view.getWidth(), view.getHeight());
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
                 toggleControls();
             }
             return true;
@@ -232,6 +258,7 @@ public final class ScreenActivity extends Activity
         }
 
         streamError = false;
+        hasReceivedVideoPacket = false;
         frameCount = 0;
         fpsWindowStart = System.currentTimeMillis();
         streamWidth = 0;
@@ -276,9 +303,11 @@ public final class ScreenActivity extends Activity
     @Override
     public void onConnected() {
         runOnUiThread(() -> {
-            liveStatus.setText("● LIVE  •  H.264");
-            streamInfo.setText("MacBook Air  •  View only  •  " + qualitySummary());
+            liveStatus.setText("CONNECTED • WAITING FOR VIDEO");
+            streamInfo.setText("Waiting for the first Mac screen frame…");
             centerControls.setVisibility(View.GONE);
+            uiHandler.removeCallbacks(noVideoFrameRunnable);
+            uiHandler.postDelayed(noVideoFrameRunnable, 8000L);
             scheduleControlsHide();
         });
     }
@@ -292,6 +321,8 @@ public final class ScreenActivity extends Activity
             long ptsMicroseconds
     ) {
         Surface surface = decoderSurface;
+        hasReceivedVideoPacket = true;
+        uiHandler.removeCallbacks(noVideoFrameRunnable);
 
         if (surface == null || !surface.isValid()) {
             return;
@@ -403,7 +434,7 @@ public final class ScreenActivity extends Activity
             }
 
             final String dimensions = width + " × " + height +
-                    "  •  VIEW ONLY  •  H.264";
+                    (controlMode ? "  •  CONTROL  •  H.264" : "  •  VIEW ONLY  •  H.264");
 
             runOnUiThread(() -> {
                 resolutionText.setText(dimensions);
@@ -677,6 +708,111 @@ public final class ScreenActivity extends Activity
         }, "PauzeControl-Quality").start();
     }
 
+    private void updateControlModeUi() {
+        Button modeButton = findViewById(R.id.controlModeButton);
+        modeButton.setText(controlMode ? "CONTROL" : "VIEW");
+        findViewById(R.id.typeTextButton).setEnabled(controlMode);
+        resolutionText.setText(controlMode ? "CONTROL ENABLED" : "VIEW ONLY • H.264");
+        if (controlMode) {
+            uiHandler.removeCallbacks(hideControlsRunnable);
+            setControlsVisible(true, true);
+        }
+        streamInfo.setText(controlMode
+                ? "Tap to click • swipe to scroll • hold+swipe to drag • ⌨ to type"
+                : "MacBook Air • View only • " + qualitySummary());
+    }
+
+    private void handleControlTouch(MotionEvent event, int width, int height) {
+        if (width <= 0 || height <= 0) return;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touchStartX = event.getX();
+                touchStartY = event.getY();
+                touchStartTime = System.currentTimeMillis();
+                touchMoved = false;
+                return;
+            case MotionEvent.ACTION_MOVE:
+                if (Math.abs(event.getX() - touchStartX) > 24 ||
+                        Math.abs(event.getY() - touchStartY) > 24) touchMoved = true;
+                return;
+            case MotionEvent.ACTION_UP:
+                float dx = event.getX() - touchStartX;
+                float dy = event.getY() - touchStartY;
+                JSONObject input = new JSONObject();
+                try {
+                    if (touchMoved && System.currentTimeMillis() - touchStartTime >= 500L) {
+                        input.put("action", "drag");
+                        input.put("startX", clamp01(touchStartX / width));
+                        input.put("startY", clamp01(touchStartY / height));
+                        input.put("x", clamp01(event.getX() / width));
+                        input.put("y", clamp01(event.getY() / height));
+                    } else if (touchMoved) {
+                        input.put("action", "scroll");
+                        input.put("x", clamp01(touchStartX / width));
+                        input.put("y", clamp01(touchStartY / height));
+                        input.put("deltaY", (int) (-dy * 2.5f));
+                        input.put("deltaX", (int) (-dx * 2.5f));
+                    } else {
+                        input.put("action", "click");
+                        input.put("x", clamp01(event.getX() / width));
+                        input.put("y", clamp01(event.getY() / height));
+                    }
+                    sendRemoteInput(input);
+                } catch (Exception ignored) { }
+                return;
+            default:
+                return;
+        }
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
+    }
+
+    private void sendRemoteInput(JSONObject input) {
+        new Thread(() -> {
+            try {
+                ApiClient.Result result = ApiClient.post(
+                        host, token, "/v1/screen/input", input.toString());
+                if (result.code < 200 || result.code >= 300) {
+                    String message = "Mac rejected remote input.";
+                    try { message = new JSONObject(result.body).optString("error", message); }
+                    catch (Exception ignored) { }
+                    final String error = message;
+                    runOnUiThread(() -> {
+                        liveStatus.setText("CONTROL ERROR");
+                        Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(
+                        this, "Could not send input to Mac.", Toast.LENGTH_SHORT).show());
+            }
+        }, "PauzeControl-RemoteInput").start();
+    }
+
+    private void showTextInput() {
+        EditText text = new EditText(this);
+        text.setSingleLine(false);
+        text.setMinLines(2);
+        new AlertDialog.Builder(this)
+                .setTitle("Type on Mac")
+                .setMessage("Text will be typed at the Mac's current focus.")
+                .setView(text)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Send", (dialog, which) -> {
+                    String value = text.getText().toString();
+                    if (value.isEmpty()) return;
+                    JSONObject input = new JSONObject();
+                    try {
+                        input.put("action", "type");
+                        input.put("text", value);
+                        sendRemoteInput(input);
+                    } catch (Exception ignored) { }
+                })
+                .show();
+    }
+
     private void toggleControls() {
         setControlsVisible(!controlsVisible, false);
 
@@ -692,6 +828,7 @@ public final class ScreenActivity extends Activity
 
     private void scheduleControlsHide() {
         uiHandler.removeCallbacks(hideControlsRunnable);
+        if (controlMode) return;
         uiHandler.postDelayed(hideControlsRunnable, 3500L);
     }
 
