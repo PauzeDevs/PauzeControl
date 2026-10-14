@@ -60,6 +60,11 @@ public final class MainActivity extends Activity {
     private View systemCard;
     private View powerCard;
     private ScrollView rootScroll;
+    private View pageHome;
+    private View pageControl;
+    private View pageActivity;
+    private View pageSettings;
+    private View[] revealViews;
 
     private TextView navDashboard;
     private TextView navControls;
@@ -115,6 +120,10 @@ public final class MainActivity extends Activity {
     private void bindViews() {
         content = findViewById(R.id.content);
         rootScroll = findViewById(R.id.rootScroll);
+        pageHome = findViewById(R.id.pageHome);
+        pageControl = findViewById(R.id.pageControl);
+        pageActivity = findViewById(R.id.pageActivity);
+        pageSettings = findViewById(R.id.pageSettings);
 
         statusCard = findViewById(R.id.statusCard);
         systemCard = findViewById(R.id.systemCard);
@@ -293,31 +302,22 @@ public final class MainActivity extends Activity {
 
     private void setupNavigation() {
         navDashboard.setOnClickListener(
-                view -> scrollTo(statusCard, navDashboard)
+                view -> showPage(pageHome, navDashboard)
         );
 
         navControls.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.controlsAnchor),
-                        navControls
-                )
+                view -> showPage(pageControl, navControls)
         );
 
         navActivity.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.activityAnchor),
-                        navActivity
-                )
+                view -> showPage(pageActivity, navActivity)
         );
 
         navSettings.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.settingsAnchor),
-                        navSettings
-                )
+                view -> showPage(pageSettings, navSettings)
         );
 
-        selectNavigation(navDashboard);
+        showPage(pageHome, navDashboard);
     }
 
     private void selectNavigation(TextView selected) {
@@ -339,31 +339,33 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void scrollTo(
-            View target,
+    private void showPage(
+            View page,
             TextView selected
     ) {
-        rootScroll.post(
-                () -> rootScroll.smoothScrollTo(
-                        0,
-                        Math.max(
-                                0,
-                                target.getTop() - 20
-                        )
-                )
-        );
+        pageHome.setVisibility(page == pageHome ? View.VISIBLE : View.GONE);
+        pageControl.setVisibility(page == pageControl ? View.VISIBLE : View.GONE);
+        pageActivity.setVisibility(page == pageActivity ? View.VISIBLE : View.GONE);
+        pageSettings.setVisibility(page == pageSettings ? View.VISIBLE : View.GONE);
+
+        rootScroll.post(() -> {
+            rootScroll.scrollTo(0, 0);
+            if (revealViews != null) {
+                refreshRevealStates(revealViews);
+            }
+        });
 
         selectNavigation(selected);
 
         selected.animate()
-                .scaleX(1.08f)
-                .scaleY(1.08f)
-                .setDuration(120)
+                .scaleX(1.04f)
+                .scaleY(1.04f)
+                .setDuration(110)
                 .withEndAction(
                         () -> selected.animate()
                                 .scaleX(1f)
                                 .scaleY(1f)
-                                .setDuration(180)
+                                .setDuration(160)
                                 .start()
                 )
                 .start();
@@ -389,6 +391,8 @@ public final class MainActivity extends Activity {
                 tokenInput,
                 findViewById(R.id.saveButton)
         };
+
+        revealViews = views;
 
         for (View view : views) {
             view.setAlpha(0f);
