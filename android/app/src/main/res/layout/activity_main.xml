@@ -673,6 +673,13 @@
                 android:text="Connect your Mac to start recording remote-control events."
                 android:textColor="#818A9B"
                 android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/activityTimeline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical" />
         </LinearLayout>
 
         </LinearLayout>
