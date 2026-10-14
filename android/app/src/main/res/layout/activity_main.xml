@@ -77,6 +77,31 @@
 
 
 
+        <LinearLayout
+            android:id="@+id/pageHome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Overview"
+                android:textColor="#FFFFFF"
+                android:textSize="27sp"
+                android:textStyle="bold"
+                android:letterSpacing="-0.02" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Your Mac at a glance"
+                android:textColor="#8995AA"
+                android:textSize="13sp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -335,6 +360,33 @@
             </LinearLayout>
         </LinearLayout>
 
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageControl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Control"
+                android:textColor="#FFFFFF"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Manage your Mac remotely"
+                android:textColor="#8995AA"
+                android:textSize="13sp" />
+
         <TextView
             android:id="@+id/controlsAnchor"
             android:layout_width="wrap_content"
@@ -557,6 +609,33 @@
                 android:letterSpacing="0.05" />
         </LinearLayout>
 
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageActivity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Activity"
+                android:textColor="#FFFFFF"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Recent connection and control events"
+                android:textColor="#8995AA"
+                android:textSize="13sp" />
+
         <TextView
             android:id="@+id/activityAnchor"
             android:layout_width="wrap_content"
@@ -595,6 +674,33 @@
                 android:textColor="#818A9B"
                 android:textSize="11sp" />
         </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Settings"
+                android:textColor="#FFFFFF"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Connection and pairing"
+                android:textColor="#8995AA"
+                android:textSize="13sp" />
 
         <TextView
             android:id="@+id/settingsAnchor"
@@ -642,6 +748,8 @@
             android:layout_marginTop="8dp"
             android:contentDescription="Save Mac connection"
             android:text="SAVE CONNECTION" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/githubLink"
