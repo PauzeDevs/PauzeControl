@@ -8,6 +8,10 @@ struct TransferFileInfo: Codable {
 }
 struct FilesListResponse: Codable { let ok: Bool; let files: [TransferFileInfo] }
 struct UploadChunkResponse: Codable { let ok: Bool; let complete: Bool }
+private struct UploadSessionMetadata: Codable {
+    let filename: String
+    let total: Int64
+}
 struct DownloadChunkResponse: Codable {
     let ok: Bool
     let filename: String
@@ -47,6 +51,8 @@ enum FileTransferStore {
         let cutoff = Date().addingTimeInterval(-maximumStagingAge)
         var remainingBytes: Int64 = 0
         var remainingCount = 0
+        var activePartialPaths = Set<String>()
+
         for url in urls {
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
             if values?.isSymbolicLink == true {
@@ -58,10 +64,21 @@ enum FileTransferStore {
             }
             if let modified = values?.contentModificationDate, modified < cutoff {
                 try? fm.removeItem(at: url)
+                try? fm.removeItem(at: url.deletingPathExtension().appendingPathExtension("meta"))
                 continue
             }
+            activePartialPaths.insert(url.path)
             remainingBytes += Int64(max(0, values?.fileSize ?? 0))
             remainingCount += 1
+        }
+
+        // A crash between finalizing a partial and removing its sidecar must
+        // not accumulate orphan metadata files forever.
+        for url in urls where url.pathExtension == "meta" {
+            let partial = url.deletingPathExtension().appendingPathExtension("part")
+            if !activePartialPaths.contains(partial.path) {
+                try? fm.removeItem(at: url)
+            }
         }
         return (remainingBytes, remainingCount)
     }
@@ -114,8 +131,10 @@ enum FileTransferStore {
         defer { lock.unlock() }
         try prepare()
         let partial = stagingURL.appendingPathComponent(transferID + ".part")
+        let metadataURL = stagingURL.appendingPathComponent(transferID + ".meta")
         let destination = rootURL.appendingPathComponent(filename)
-        if (try? partial.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+        if (try? partial.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true ||
+           (try? metadataURL.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
             throw NSError(domain: "PauzeControl.Files", code: 409,
                           userInfo: [NSLocalizedDescriptionKey: "Upload staging path must not be a symbolic link."])
         }
@@ -147,11 +166,23 @@ enum FileTransferStore {
                 throw NSError(domain: "PauzeControl.Files", code: 500,
                               userInfo: [NSLocalizedDescriptionKey: "Could not create the temporary upload file."])
             }
+            do {
+                let metadata = UploadSessionMetadata(filename: filename, total: total)
+                let metadataData = try JSONEncoder().encode(metadata)
+                try metadataData.write(to: metadataURL, options: [.atomic])
+            } catch {
+                try? fm.removeItem(at: partial)
+                try? fm.removeItem(at: metadataURL)
+                throw error
+            }
         } else {
             guard let partialValues = try? partial.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
-                  partialValues.isRegularFile == true, partialValues.isSymbolicLink != true else {
+                  partialValues.isRegularFile == true, partialValues.isSymbolicLink != true,
+                  let metadataData = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONDecoder().decode(UploadSessionMetadata.self, from: metadataData),
+                  metadata.filename == filename, metadata.total == total else {
                 throw NSError(domain: "PauzeControl.Files", code: 400,
-                              userInfo: [NSLocalizedDescriptionKey: "Upload session expired or first chunk is missing."])
+                              userInfo: [NSLocalizedDescriptionKey: "Upload session metadata does not match this filename or declared size."])
             }
         }
         let attrs = try fm.attributesOfItem(atPath: partial.path)
@@ -178,10 +209,12 @@ enum FileTransferStore {
         if newSize == total {
             guard !fm.fileExists(atPath: destination.path) else {
                 try? fm.removeItem(at: partial)
+                try? fm.removeItem(at: metadataURL)
                 throw NSError(domain: "PauzeControl.Files", code: 409,
                               userInfo: [NSLocalizedDescriptionKey: "A file with this name already exists."])
             }
             try fm.moveItem(at: partial, to: destination)
+            try? fm.removeItem(at: metadataURL)
             return true
         }
         return false
