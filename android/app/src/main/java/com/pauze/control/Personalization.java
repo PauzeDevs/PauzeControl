@@ -94,7 +94,6 @@ public final class Personalization {
                 v.setTag(R.id.pauzeOriginalTextColor, original);
             }
             if (accent) t.setTextColor(Color.WHITE);
-            else if (warm) t.setTextColor(near(original, TERRACOTTA) ? p.accent : original);
             else t.setTextColor(mapText(original, p));
         }
         if (v instanceof SeekBar) {
@@ -113,7 +112,7 @@ public final class Personalization {
         if (near(color, MUTED)) return p.muted;
         if (near(color, PAPER_WHITE)) return p.foreground;
         int y = (int) (0.2126 * Color.red(color) + 0.7152 * Color.green(color) + 0.0722 * Color.blue(color));
-        return y < 145 ? p.foreground : p.muted;
+        return (y < 90 || y > 205) ? p.foreground : p.muted;
     }
 
     private static boolean near(int a, int b) {
