@@ -6,7 +6,7 @@ This guide covers local builds, signing, installation checks, and release verifi
 
 - **Source version on `main`:** v1.6.0 / Android version code 6.
 - **Latest published stable APK:** [PauzeControl v1.5.0](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0).
-- **v1.6.0:** beta release packaging is configured for tag `v1.6.0-beta.1`. Until that tag's release workflow completes, the v1.5.0 download is still the latest published stable APK.
+- **v1.6.0 Beta 1:** the beta workflow publishes tag `v1.6.0-beta.1` when the marked release-preparation commit is merged to `main`. The workflow creates the GitHub prerelease and attaches a verified debug APK plus checksum. Until its assets are uploaded, use the source-build steps below.
 - **Package:** `com.pauze.control`.
 - **Android minimum:** API 26 (Android 8.0); compile/target SDK 35.
 - **Android toolchain:** JDK 17 and Gradle 8.9.
@@ -155,7 +155,7 @@ Do not forward TCP port 47777 to the public internet.
 
 ## v1.6.0 beta packaging
 
-The `.github/workflows/android-release.yml` workflow is configured to run when the tag `v1.6.0-beta.1` is pushed. It builds and verifies the Android debug APK, calculates a SHA-256 checksum, and publishes the beta GitHub Release assets. The workflow requires repository Actions write permission. Creating the tag/release is a separate GitHub action; the source branch alone does not make an APK downloadable.
+The `.github/workflows/android-release.yml` workflow runs on pushes to `main`, but publishes only when the merge commit title contains the marker `[release-v1.6.0-beta]`. It builds and verifies the Android debug APK, calculates a SHA-256 checksum, creates tag `v1.6.0-beta.1`, and publishes the prerelease assets. Ordinary main-branch pushes skip the release job. The workflow requires repository Actions write permission.
 
 The beta APK is debug-signed and is intended for direct testing, not Google Play distribution. Do not label it production-signed.
 
