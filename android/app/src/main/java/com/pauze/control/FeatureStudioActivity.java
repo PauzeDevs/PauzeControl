@@ -435,12 +435,19 @@ public final class FeatureStudioActivity extends Activity {
             try (OutputStream out = getContentResolver().openOutputStream(destination, "w")) {
                 if (out == null) throw new IllegalStateException("Could not open destination file.");
                 long offset = 0;
-                while (offset < expectedSize) {
+                boolean firstRequest = true;
+                while (offset < expectedSize || firstRequest) {
+                    firstRequest = false;
                     JSONObject response = new JSONObject(post("/v1/files/download-chunk",
                             new JSONObject().put("filename", filename).put("offset", offset)).body);
+                    if (!response.optBoolean("ok", false)) throw new IllegalStateException(response.optString("error", "Mac rejected a download chunk."));
+                    if (!filename.equals(response.optString("filename", "")) || response.optLong("offset", -1) != offset)
+                        throw new IllegalStateException("Mac returned a chunk for the wrong file or offset.");
                     if (response.optLong("total", -1) != expectedSize) throw new IllegalStateException("Remote file changed during download.");
                     byte[] chunk = android.util.Base64.decode(response.optString("data", ""), android.util.Base64.DEFAULT);
-                    if (chunk.length == 0 || offset + chunk.length > expectedSize) throw new IllegalStateException("Mac returned an invalid file chunk.");
+                    if (offset + chunk.length > expectedSize || (chunk.length == 0 && expectedSize != 0))
+                        throw new IllegalStateException("Mac returned an invalid file chunk.");
+                    if (chunk.length == 0 && expectedSize == 0) break;
                     out.write(chunk); offset += chunk.length; long progress = offset;
                     main.post(() -> transferText.setText("Downloading " + filename + " • " + formatBytes(progress) + " / " + formatBytes(expectedSize)));
                 }
@@ -466,7 +473,10 @@ public final class FeatureStudioActivity extends Activity {
         audioText.setText("Reading macOS audio devices…");
         io.execute(() -> {
             try {
-                JSONArray array = new JSONObject(get("/v1/audio/devices").body).optJSONArray("devices");
+                JSONObject deviceResponse = new JSONObject(get("/v1/audio/devices").body);
+                if (!deviceResponse.optBoolean("ok", false))
+                    throw new IllegalStateException(deviceResponse.optString("error", "Mac could not enumerate audio devices."));
+                JSONArray array = deviceResponse.optJSONArray("devices");
                 ArrayList<AudioDevice> out = new ArrayList<>(), in = new ArrayList<>();
                 if (array != null) for (int i = 0; i < array.length(); i++) {
                     JSONObject d = array.optJSONObject(i); if (d == null) continue;
@@ -509,7 +519,10 @@ public final class FeatureStudioActivity extends Activity {
         if (!ready()) return; audioText.setText("Changing " + direction + " device…");
         io.execute(() -> {
             try {
-                post("/v1/audio/device", new JSONObject().put("id", device.id).put("direction", direction));
+                JSONObject response = new JSONObject(post("/v1/audio/device",
+                        new JSONObject().put("id", device.id).put("direction", direction)).body);
+                if (!response.optBoolean("ok", false))
+                    throw new IllegalStateException(response.optString("error", "Mac rejected the audio device change."));
                 main.post(() -> { audioText.setText("Default " + direction + " device updated."); refreshAudioDevices(); });
             } catch (Exception e) { main.post(() -> { audioText.setText("Audio change failed: " + message(e)); toast("Audio selection failed: " + message(e)); }); }
         });
