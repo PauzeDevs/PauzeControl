@@ -24,11 +24,11 @@ public final class SlideActionView extends FrameLayout {
         void onSlideComplete(SlideActionView view);
     }
 
-    private static final int SURFACE = Color.rgb(16, 22, 34);
-    private static final int BORDER = Color.rgb(38, 49, 69);
-    private static final int TEXT = Color.WHITE;
-    private static final int SUBTLE = Color.rgb(148, 157, 174);
-    private static final int SWITCH_OFF = Color.rgb(62, 68, 79);
+    private static final int SURFACE = Color.rgb(248, 240, 232);
+    private static final int BORDER = Color.rgb(214, 170, 145);
+    private static final int TEXT = Color.rgb(40, 33, 30);
+    private static final int SUBTLE = Color.rgb(133, 117, 106);
+    private static final int SWITCH_OFF = Color.rgb(189, 119, 93);
     private static final int SWITCH_ON = Color.rgb(52, 199, 89);
 
     private final TextView labelView;
