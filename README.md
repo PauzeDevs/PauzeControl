@@ -8,6 +8,8 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 >
 > **Release scope:** v1.5.0 updates the Android app design and live-screen zoom only. No files under `mac/` changed; the Mac agent does not need a source-code update.
 >
+> **Upcoming source update:** the `main` branch is being prepared for v1.6.0 with Device Studio, multi-Mac profiles, Personalisation Studio, manual clipboard transfer, secure file transfer and audio-device selection. These changes are not included in the currently downloadable v1.5.0 APK; no v1.6.0 release has been published. See [v1.6.0 development notes](docs/RELEASE_NOTES_v1.6.0.md).
+>
 > **Signing:** Both channel APKs are debug-signed direct GitHub downloads. The stable channel is not a production-signed or Google Play release. Android may reject an in-place update if the signing certificate differs from the installed APK. See [Build notes](docs/BUILD_NOTES.md).
 
 ## Features
