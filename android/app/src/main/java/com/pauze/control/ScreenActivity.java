@@ -1088,15 +1088,28 @@ public final class ScreenActivity extends Activity
     private void setControlsVisible(boolean visible, boolean animate) {
         controlsVisible = visible;
         float target = visible ? 1f : 0f;
+        View[] controls = {topControls, bottomControls, zoomControls};
 
-        if (animate) {
-            topControls.animate().alpha(target).setDuration(220).start();
-            bottomControls.animate().alpha(target).setDuration(220).start();
-            zoomControls.animate().alpha(target).setDuration(220).start();
-        } else {
-            topControls.setAlpha(target);
-            bottomControls.setAlpha(target);
-            zoomControls.setAlpha(target);
+        // Alpha alone does not remove a view from hit-testing. Invisible overlay
+        // controls must stop intercepting taps when the viewer is in view mode.
+        if (visible) {
+            for (View control : controls) control.setVisibility(View.VISIBLE);
+        }
+
+        for (View control : controls) {
+            control.animate().cancel();
+            if (animate) {
+                control.animate()
+                        .alpha(target)
+                        .setDuration(220)
+                        .withEndAction(() -> {
+                            if (!visible) control.setVisibility(View.INVISIBLE);
+                        })
+                        .start();
+            } else {
+                control.setAlpha(target);
+                control.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+            }
         }
     }
 
