@@ -6,11 +6,11 @@
         parent="@android:style/Theme.Material.NoActionBar">
 
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#070B14</item>
-        <item name="android:navigationBarColor">#070B14</item>
-        <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:colorAccent">#6D7CFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F2E5D8</item>
+        <item name="android:navigationBarColor">#F2E5D8</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:colorAccent">#955740</item>
 
     </style>
 </resources>
