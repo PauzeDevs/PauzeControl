@@ -40,13 +40,17 @@ enum FileTransferStore {
     private static func cleanupStaging() throws -> Int64 {
         let urls = try fm.contentsOfDirectory(
             at: stagingURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey],
             options: [.skipsHiddenFiles]
         )
         let cutoff = Date().addingTimeInterval(-maximumStagingAge)
         var remainingBytes: Int64 = 0
         for url in urls {
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
+            if values?.isSymbolicLink == true {
+                try? fm.removeItem(at: url)
+                continue
+            }
             guard values?.isRegularFile == true, url.pathExtension == "part" else {
                 continue
             }
@@ -85,8 +89,8 @@ enum FileTransferStore {
             options: [.skipsHiddenFiles])
         return urls.compactMap { url in
             guard url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL,
-                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
-                  values.isRegularFile == true, let size = values.fileSize,
+                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]),
+                  values.isSymbolicLink != true, values.isRegularFile == true, let size = values.fileSize,
                   Int64(size) <= maximumFileBytes else { return nil }
             return TransferFileInfo(name: url.lastPathComponent, size: Int64(size),
                 modifiedAt: values.contentModificationDate?.timeIntervalSince1970 ?? 0)
@@ -108,6 +112,10 @@ enum FileTransferStore {
         try prepare()
         let partial = stagingURL.appendingPathComponent(transferID + ".part")
         let destination = rootURL.appendingPathComponent(filename)
+        if (try? partial.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+            throw NSError(domain: "PauzeControl.Files", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "Upload staging path must not be a symbolic link."])
+        }
         if offset == 0 {
             let stagedBytes = try cleanupStaging()
             guard total <= maximumStagedBytes - min(stagedBytes, maximumStagedBytes) else {
@@ -126,9 +134,12 @@ enum FileTransferStore {
                 throw NSError(domain: "PauzeControl.Files", code: 500,
                               userInfo: [NSLocalizedDescriptionKey: "Could not create the temporary upload file."])
             }
-        } else if !fm.fileExists(atPath: partial.path) {
-            throw NSError(domain: "PauzeControl.Files", code: 400,
-                          userInfo: [NSLocalizedDescriptionKey: "Upload session expired or first chunk is missing."])
+        } else {
+            guard let partialValues = try? partial.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  partialValues.isRegularFile == true, partialValues.isSymbolicLink != true else {
+                throw NSError(domain: "PauzeControl.Files", code: 400,
+                              userInfo: [NSLocalizedDescriptionKey: "Upload session expired or first chunk is missing."])
+            }
         }
         let attrs = try fm.attributesOfItem(atPath: partial.path)
         let currentSize = (attrs[.size] as? NSNumber)?.int64Value ?? -1
@@ -172,8 +183,8 @@ enum FileTransferStore {
         try prepare()
         let url = rootURL.appendingPathComponent(filename)
         guard url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL,
-              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-              values.isRegularFile == true, let size = values.fileSize,
+              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+              values.isSymbolicLink != true, values.isRegularFile == true, let size = values.fileSize,
               Int64(size) <= maximumFileBytes, offset <= Int64(size) else {
             throw NSError(domain: "PauzeControl.Files", code: 404,
                           userInfo: [NSLocalizedDescriptionKey: "Transferred file was not found or exceeds the download limit."])
