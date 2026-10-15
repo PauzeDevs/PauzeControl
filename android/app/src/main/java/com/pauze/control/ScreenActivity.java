@@ -14,6 +14,7 @@ import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.Toast;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -40,6 +41,19 @@ public final class ScreenActivity extends Activity
     private LinearLayout topControls;
     private LinearLayout bottomControls;
     private LinearLayout centerControls;
+    private LinearLayout zoomControls;
+    private TextView zoomLevelText;
+    private ScaleGestureDetector zoomGestureDetector;
+    private float zoomScale = 1f;
+    private float zoomTranslationX;
+    private float zoomTranslationY;
+    private float lastGestureFocusX;
+    private float lastGestureFocusY;
+    private boolean haveGestureFocus;
+    private boolean zoomGestureConsumed;
+
+    private static final float MIN_ZOOM = 1f;
+    private static final float MAX_ZOOM = 3f;
 
     private ScreenStreamClient streamClient;
     private MediaCodec decoder;
@@ -134,6 +148,34 @@ public final class ScreenActivity extends Activity
         topControls = findViewById(R.id.topControls);
         bottomControls = findViewById(R.id.bottomControls);
         centerControls = findViewById(R.id.centerControls);
+        zoomControls = findViewById(R.id.zoomControls);
+        zoomLevelText = findViewById(R.id.zoomLevelText);
+
+        zoomGestureDetector = new ScaleGestureDetector(
+                this,
+                new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override
+                    public boolean onScale(ScaleGestureDetector detector) {
+                        setZoomLevel(
+                                zoomScale * detector.getScaleFactor(),
+                                detector.getFocusX(),
+                                detector.getFocusY()
+                        );
+                        return true;
+                    }
+                }
+        );
+
+        findViewById(R.id.zoomInButton).setOnClickListener(
+                view -> zoomBy(0.25f)
+        );
+        findViewById(R.id.zoomOutButton).setOnClickListener(
+                view -> zoomBy(-0.25f)
+        );
+        findViewById(R.id.zoomResetButton).setOnClickListener(
+                view -> resetZoom()
+        );
+        updateZoomLabel();
 
         host = getIntent().getStringExtra("host");
         token = getIntent().getStringExtra("token");
@@ -177,12 +219,49 @@ public final class ScreenActivity extends Activity
         fullscreenButton.setOnClickListener(view -> toggleFullscreen());
         qualityButton.setOnClickListener(view -> showQualityPicker());
 
-        // Tapping the video behaves like a modern video player: controls
-        // appear briefly, then fade away so the Mac screen gets the focus.
+        // Pinch to zoom and two-finger pan work in both VIEW and CONTROL
+        // modes. Single-finger input remains mapped to the Mac's full frame.
         screenSurface.setOnTouchListener((view, event) -> {
+            zoomGestureDetector.onTouchEvent(event);
+            int action = event.getActionMasked();
+
+            if (event.getPointerCount() >= 2) {
+                zoomGestureConsumed = true;
+                float focusX = getGestureFocusX(event);
+                float focusY = getGestureFocusY(event);
+
+                if (action == MotionEvent.ACTION_POINTER_DOWN) {
+                    lastGestureFocusX = focusX;
+                    lastGestureFocusY = focusY;
+                    haveGestureFocus = true;
+                } else if (action == MotionEvent.ACTION_MOVE) {
+                    if (haveGestureFocus && zoomScale > MIN_ZOOM) {
+                        zoomTranslationX += focusX - lastGestureFocusX;
+                        zoomTranslationY += focusY - lastGestureFocusY;
+                        applyZoomTransform();
+                    }
+                    lastGestureFocusX = focusX;
+                    lastGestureFocusY = focusY;
+                    haveGestureFocus = true;
+                } else if (action == MotionEvent.ACTION_POINTER_UP ||
+                        action == MotionEvent.ACTION_CANCEL) {
+                    haveGestureFocus = false;
+                }
+                return true;
+            }
+
+            if (zoomGestureConsumed) {
+                if (action == MotionEvent.ACTION_UP ||
+                        action == MotionEvent.ACTION_CANCEL) {
+                    zoomGestureConsumed = false;
+                    haveGestureFocus = false;
+                }
+                return true;
+            }
+
             if (controlMode) {
                 handleControlTouch(event, view.getWidth(), view.getHeight());
-            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+            } else if (action == MotionEvent.ACTION_UP) {
                 toggleControls();
             }
             return true;
@@ -503,6 +582,7 @@ public final class ScreenActivity extends Activity
 
         screenSurface.setLayoutParams(params);
         aspectApplied = true;
+        screenSurface.post(this::applyZoomTransform);
     }
 
     private void drainDecoder(MediaCodec activeDecoder) {
@@ -722,6 +802,100 @@ public final class ScreenActivity extends Activity
                 : "MacBook Air • View only • " + qualitySummary());
     }
 
+    private void zoomBy(float delta) {
+        if (screenSurface == null) return;
+        setZoomLevel(
+                zoomScale + delta,
+                screenSurface.getWidth() / 2f,
+                screenSurface.getHeight() / 2f
+        );
+        showControlsTemporarily();
+    }
+
+    private void resetZoom() {
+        zoomScale = MIN_ZOOM;
+        zoomTranslationX = 0f;
+        zoomTranslationY = 0f;
+        applyZoomTransform();
+        showControlsTemporarily();
+    }
+
+    private void setZoomLevel(float requested, float focusX, float focusY) {
+        float next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, requested));
+        if (screenSurface == null || next == zoomScale) {
+            updateZoomLabel();
+            return;
+        }
+
+        float old = zoomScale;
+        float centerX = screenSurface.getWidth() / 2f;
+        float centerY = screenSurface.getHeight() / 2f;
+
+        // Keep the point under the fingers stationary while scaling.
+        zoomTranslationX += (focusX - centerX) * (old - next);
+        zoomTranslationY += (focusY - centerY) * (old - next);
+        zoomScale = next;
+        applyZoomTransform();
+    }
+
+    private void applyZoomTransform() {
+        if (screenSurface == null || screenSurface.getWidth() <= 0 ||
+                screenSurface.getHeight() <= 0) {
+            updateZoomLabel();
+            return;
+        }
+
+        screenSurface.setPivotX(screenSurface.getWidth() / 2f);
+        screenSurface.setPivotY(screenSurface.getHeight() / 2f);
+        screenSurface.setScaleX(zoomScale);
+        screenSurface.setScaleY(zoomScale);
+
+        View parent = (View) screenSurface.getParent();
+        float parentWidth = parent == null
+                ? screenSurface.getWidth() : parent.getWidth();
+        float parentHeight = parent == null
+                ? screenSurface.getHeight() : parent.getHeight();
+
+        float maxX = Math.max(
+                0f,
+                (screenSurface.getWidth() * zoomScale - parentWidth) / 2f
+        );
+        float maxY = Math.max(
+                0f,
+                (screenSurface.getHeight() * zoomScale - parentHeight) / 2f
+        );
+
+        zoomTranslationX = Math.max(-maxX, Math.min(maxX, zoomTranslationX));
+        zoomTranslationY = Math.max(-maxY, Math.min(maxY, zoomTranslationY));
+        screenSurface.setTranslationX(zoomTranslationX);
+        screenSurface.setTranslationY(zoomTranslationY);
+        updateZoomLabel();
+    }
+
+    private void updateZoomLabel() {
+        if (zoomLevelText != null) {
+            zoomLevelText.setText(String.format(
+                    Locale.US, "%.1f×", zoomScale
+            ));
+        }
+    }
+
+    private float getGestureFocusX(MotionEvent event) {
+        float total = 0f;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            total += event.getX(i);
+        }
+        return total / Math.max(1, event.getPointerCount());
+    }
+
+    private float getGestureFocusY(MotionEvent event) {
+        float total = 0f;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            total += event.getY(i);
+        }
+        return total / Math.max(1, event.getPointerCount());
+    }
+
     private void handleControlTouch(MotionEvent event, int width, int height) {
         if (width <= 0 || height <= 0) return;
         switch (event.getActionMasked()) {
@@ -839,9 +1013,11 @@ public final class ScreenActivity extends Activity
         if (animate) {
             topControls.animate().alpha(target).setDuration(220).start();
             bottomControls.animate().alpha(target).setDuration(220).start();
+            zoomControls.animate().alpha(target).setDuration(220).start();
         } else {
             topControls.setAlpha(target);
             bottomControls.setAlpha(target);
+            zoomControls.setAlpha(target);
         }
     }
 
