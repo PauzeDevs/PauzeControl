@@ -65,13 +65,13 @@ public final class ApiClient {
         HttpURLConnection connection = (HttpURLConnection) buildUri(host, path).toURL().openConnection();
         try {
             configure(connection, token, method, path, body);
-            connection.setReadTimeout(5000);
+            connection.setReadTimeout(15000);
 
             if ("POST".equals(method)) {
                 byte[] payload = body.getBytes(StandardCharsets.UTF_8);
                 connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(payload.length);
                 connection.setRequestProperty("Content-Type", "application/json");
-                connection.setRequestProperty("Content-Length", Integer.toString(payload.length));
                 try (OutputStream output = connection.getOutputStream()) {
                     output.write(payload);
                 }
