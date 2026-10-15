@@ -68,6 +68,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var starting = false
     private var forceNextKeyframe = true
     private var retryWorkItem: DispatchWorkItem?
+    private var stableCaptureResetWorkItem: DispatchWorkItem?
     private var captureAttempt = 0
     private var activeFPS = 30
     private var activeBitrate = 4_000_000
@@ -192,6 +193,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func restartCapture() {
         retryWorkItem?.cancel()
         retryWorkItem = nil
+        stableCaptureResetWorkItem?.cancel()
+        stableCaptureResetWorkItem = nil
         captureAttempt = 0
         starting = false
 
@@ -272,6 +275,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                         self.starting = true
                         self.loadShareableContent()
                     } else {
+                        self.captureAttempt += 1
                         self.starting = false
                         self.scheduleCaptureRetry()
                     }
@@ -280,7 +284,6 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             return
         }
         starting = true
-        captureAttempt = 0
         retryWorkItem?.cancel()
         retryWorkItem = nil
         loadShareableContent()
@@ -300,7 +303,6 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                 }
                 let mainID = CGMainDisplayID()
                 let display = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first!
-                self.captureAttempt = 0
                 self.startStream(for: display)
             }
         }
@@ -374,11 +376,13 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                         print("[PauzeControl] Screen capture failed: \(error)")
                         self.stream = nil
                         self.invalidateEncoder()
+                        self.captureAttempt += 1
                         self.starting = false
                         self.scheduleCaptureRetry()
                         return
                     }
                     self.starting = false
+                    self.scheduleStableCaptureReset(for: newStream)
                     print("[PauzeControl] Screen capture started: \(self.outputWidth)x\(self.outputHeight) @ \(self.activeFPS) FPS H.264 (\(self.activeProfileName)).")
                 }
             }
@@ -386,9 +390,24 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             print("[PauzeControl] Unable to attach screen output: \(error)")
             stream = nil
             invalidateEncoder()
+            captureAttempt += 1
             starting = false
             scheduleCaptureRetry()
         }
+    }
+
+    private func scheduleStableCaptureReset(for stream: SCStream) {
+        stableCaptureResetWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self, weak stream] in
+            guard let self, let stream else { return }
+            self.queue.async {
+                guard self.stream === stream else { return }
+                self.captureAttempt = 0
+                self.stableCaptureResetWorkItem = nil
+            }
+        }
+        stableCaptureResetWorkItem = work
+        queue.asyncAfter(deadline: .now() + 30, execute: work)
     }
 
     private func scheduleCaptureRetry() {
@@ -442,6 +461,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func stopCapture() {
         retryWorkItem?.cancel()
         retryWorkItem = nil
+        stableCaptureResetWorkItem?.cancel()
+        stableCaptureResetWorkItem = nil
         captureAttempt = 0
         starting = false
         if let stream {
@@ -553,6 +574,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             guard self.stream === stream else { return }
             self.stream = nil
             self.invalidateEncoder()
+            self.captureAttempt += 1
             self.starting = false
             if !self.subscribers.isEmpty { self.scheduleCaptureRetry() }
         }
