@@ -18,6 +18,14 @@
 
 ---
 
+## Project website
+
+- [PauzeControl website](https://pauzedevs.github.io/PauzeControl-Website/)
+- [Documentation](https://pauzedevs.github.io/PauzeControl-Website/docs.html)
+- [System status](https://pauzedevs.github.io/PauzeControl-Website/status.html)
+
+---
+
 ## What is PauzeControl?
 
 PauzeControl is made up of two parts: an Android app you use as the controller, and a small native agent that runs on the Mac you want to control. The two communicate over Tailscale, so you don't need to run a separate cloud server.
