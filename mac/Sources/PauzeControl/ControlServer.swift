@@ -16,6 +16,8 @@ final class ControlServer {
     )
 
     private var listener: NWListener?
+    private let listenerStateLock = NSLock()
+    private var listenerReady = false
     private var seenNonces: [String: Date] = [:]
     private let nonceLock = NSLock()
 
@@ -32,7 +34,29 @@ final class ControlServer {
         self.manager = manager
     }
 
+    var isListening: Bool {
+        listenerStateLock.lock()
+        defer { listenerStateLock.unlock() }
+        return listenerReady
+    }
+
+    private func setListenerReady(_ ready: Bool) {
+        listenerStateLock.lock()
+        listenerReady = ready
+        listenerStateLock.unlock()
+    }
+
     func start() throws {
+        // A previous listener may have failed asynchronously. Tear it down
+        // before rebinding, and let the controller retry on its health timer.
+        if let existing = listener {
+            existing.stateUpdateHandler = nil
+            existing.newConnectionHandler = nil
+            existing.cancel()
+            listener = nil
+        }
+        setListenerReady(false)
+
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             throw NSError(
                 domain: "PauzeControl.Server",
@@ -49,16 +73,17 @@ final class ControlServer {
             on: nwPort
         )
 
-        listener.stateUpdateHandler = { state in
+        listener.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
-                print(
-                    "[PauzeControl] listening on port \(self.port)"
-                )
+                self.setListenerReady(true)
+                print("[PauzeControl] listening on port \(self.port)")
             case .failed(let error):
-                print(
-                    "[PauzeControl] listener failed: \(error)"
-                )
+                self.setListenerReady(false)
+                print("[PauzeControl] listener failed: \(error)")
+            case .cancelled:
+                self.setListenerReady(false)
             default:
                 break
             }
