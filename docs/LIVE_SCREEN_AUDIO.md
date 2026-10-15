@@ -5,7 +5,7 @@ This document covers the opt-in system-output audio feature on the live-audio de
 ## Design
 
 - Capture source: macOS ScreenCaptureKit system output, not the Mac microphone.
-- Trigger: audio capture is disabled by default and is requested only when an authenticated Android viewer opens `/v1/screen?audio=1`.
+- Trigger: audio capture is off at the start of every Live Screen session and is requested only after the user explicitly enables it, causing the authenticated Android viewer to open `/v1/screen?audio=1`.
 - Format: mono signed 16-bit little-endian PCM, 24,000 samples/second.
 - Transport: the existing authenticated PZV1 screen TCP stream; video-only clients continue to use the original video packet format.
 - Packet flags: video uses bit 0 for keyframes; audio uses flag `0x02`. Audio packets have zero width/height and carry a presentation timestamp in microseconds.
