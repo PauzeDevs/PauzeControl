@@ -138,7 +138,7 @@ final class ControlServer {
             if let request = HTTPRequest.parse(buffer) {
                 deadline.cancel()
                 if request.method == "GET",
-                   request.path == "/v1/screen" {
+                   (request.path == "/v1/screen" || request.path.hasPrefix("/v1/screen?")) {
                     self.startScreenStream(
                         connection: connection,
                         request: request
@@ -278,8 +278,19 @@ final class ControlServer {
             return
         }
 
-        // Authenticated private H.264 stream using the PZV1 packet wrapper.
-        let header = [
+        // The audio option is part of the signed request path, so it cannot
+        // be changed by an intermediary after authentication.
+        let queryParts = request.path.split(
+            separator: "?",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
+        let audioEnabled = queryParts.count > 1 &&
+            queryParts[1].split(separator: "&").contains("audio=1")
+
+        // Authenticated private screen stream using the PZV1 packet wrapper.
+        // Video-only clients continue to receive ordinary H.264 packets.
+        var responseHeaders = [
             "HTTP/1.1 200 OK",
             "Content-Type: video/H264",
             "Cache-Control: no-cache, no-store, must-revalidate",
@@ -289,16 +300,23 @@ final class ControlServer {
             "X-Pauze-Frame-Format: PZV1",
             "X-Pauze-Max-Width: \(ScreenStreamer.maxWidth)",
             "X-Pauze-Max-Height: \(ScreenStreamer.maxHeight)",
-            "X-Pauze-Max-FPS: \(ScreenStreamer.maxFPS)",
-            "",
-            ""
-        ].joined(separator: "\r\n")
+            "X-Pauze-Max-FPS: \(ScreenStreamer.maxFPS)"
+        ]
+        if audioEnabled {
+            responseHeaders.append("X-Pauze-Audio-Codec: PCM_S16LE")
+            responseHeaders.append("X-Pauze-Audio-Sample-Rate: \(ScreenStreamer.audioSampleRate)")
+            responseHeaders.append("X-Pauze-Audio-Channels: 1")
+        }
+        responseHeaders.append("")
+        responseHeaders.append("")
+        let header = responseHeaders.joined(separator: "\r\n")
 
         let clientID = UUID()
 
         let client = ScreenClient(
             connection: connection,
             stream: ScreenStreamer.shared,
+            audioEnabled: audioEnabled,
             onClose: { [weak self] in
                 self?.removeScreenClient(clientID)
             }
@@ -778,9 +796,11 @@ private struct RemoteInputResponse: Codable {
 private final class ScreenClient {
     private static let headerSize = 24
     private static let magic = Data([0x50, 0x5A, 0x56, 0x31])
+    private static let maximumPendingAudioPackets = 12
 
     private let connection: NWConnection
     private let stream: ScreenStreamer
+    private let audioEnabled: Bool
     private let onClose: () -> Void
 
     private let queue = DispatchQueue(
@@ -789,24 +809,33 @@ private final class ScreenClient {
     )
 
     private var subscriberID: UUID?
-    private var pending: EncodedScreenFrame?
+    private var pendingVideo: EncodedScreenFrame?
+    private var pendingAudio: [EncodedScreenAudio] = []
     private var sending = false
     private var closed = false
 
     init(
         connection: NWConnection,
         stream: ScreenStreamer,
+        audioEnabled: Bool,
         onClose: @escaping () -> Void
     ) {
         self.connection = connection
         self.stream = stream
+        self.audioEnabled = audioEnabled
         self.onClose = onClose
     }
 
     func start() {
-        let id = stream.subscribe { [weak self] frame in
-            self?.enqueue(frame: frame)
-        }
+        let id = stream.subscribe(
+            audioEnabled: audioEnabled,
+            onFrame: { [weak self] frame in
+                self?.enqueue(frame: frame)
+            },
+            onAudio: { [weak self] packet in
+                self?.enqueue(audio: packet)
+            }
+        )
 
         queue.async {
             guard !self.closed else {
@@ -831,120 +860,122 @@ private final class ScreenClient {
                 self.subscriberID = nil
             }
 
-            self.pending = nil
+            self.pendingVideo = nil
+            self.pendingAudio.removeAll(keepingCapacity: false)
             self.sending = false
             self.connection.cancel()
             self.onClose()
         }
     }
 
-    private func enqueue(
-        frame: EncodedScreenFrame
-    ) {
+    private func enqueue(frame: EncodedScreenFrame) {
         queue.async {
             guard !self.closed else {
                 return
             }
 
-            // Keep the latest useful frame; do not evict a pending keyframe.
-            if let pending = self.pending,
+            // Keep the latest useful video frame; do not evict a pending
+            // keyframe before the Android decoder has a chance to receive it.
+            if let pending = self.pendingVideo,
                pending.keyFrame,
                !frame.keyFrame {
                 return
             }
 
-            self.pending = frame
+            self.pendingVideo = frame
+            guard !self.sending else { return }
+            self.sendNext()
+        }
+    }
 
-            guard !self.sending else {
+    private func enqueue(audio packet: EncodedScreenAudio) {
+        queue.async {
+            guard !self.closed, self.audioEnabled else {
                 return
             }
 
+            // Audio is real-time data: bound memory and prefer recent chunks
+            // when the network falls behind instead of building a long delay.
+            if self.pendingAudio.count >= Self.maximumPendingAudioPackets {
+                self.pendingAudio.removeFirst()
+            }
+            self.pendingAudio.append(packet)
+
+            guard !self.sending else { return }
             self.sendNext()
         }
     }
 
     private func sendNext() {
-        guard !closed else {
-            return
-        }
+        guard !closed else { return }
 
-        guard let frame = pending else {
+        let payload: Data
+        if !pendingAudio.isEmpty {
+            payload = makeAudioPacket(pendingAudio.removeFirst())
+        } else if let frame = pendingVideo {
+            pendingVideo = nil
+            payload = makeVideoPacket(frame)
+        } else {
             sending = false
             return
         }
 
-        pending = nil
         sending = true
-
         connection.send(
-            content: makePacket(frame),
+            content: payload,
             completion: .contentProcessed { [weak self] error in
                 guard let self else { return }
-
                 self.queue.async {
                     self.sending = false
-
                     if error != nil {
                         self.closed = true
-
                         if let id = self.subscriberID {
                             self.stream.unsubscribe(id)
                             self.subscriberID = nil
                         }
-
-                        self.pending = nil
+                        self.pendingVideo = nil
+                        self.pendingAudio.removeAll(keepingCapacity: false)
                         self.connection.cancel()
                         self.onClose()
                         return
                     }
-
                     self.sendNext()
                 }
             }
         )
     }
 
-    private func makePacket(
-        _ frame: EncodedScreenFrame
-    ) -> Data {
-        // 24-byte header:
-        // magic[4], version[1], flags[1], headerLength[2],
+    private func makeVideoPacket(_ frame: EncodedScreenFrame) -> Data {
+        // PZV1 header: magic[4], version[1], flags[1], headerLength[2],
         // payloadLength[4], ptsUs[8], width[2], height[2].
         var packet = Self.magic
-
         packet.append(0x01)
         packet.append(frame.keyFrame ? 0x01 : 0x00)
-
-        appendUInt16(
-            UInt16(Self.headerSize),
-            to: &packet
-        )
-
-        appendUInt32(
-            UInt32(frame.data.count),
-            to: &packet
-        )
-
-        appendUInt64(
-            UInt64(bitPattern: frame.ptsMicroseconds),
-            to: &packet
-        )
-
-        appendUInt16(
-            UInt16(max(0, min(frame.width, ScreenStreamer.maxWidth))),
-            to: &packet
-        )
-
-        appendUInt16(
-            UInt16(max(0, min(frame.height, ScreenStreamer.maxHeight))),
-            to: &packet
-        )
-
+        appendUInt16(UInt16(Self.headerSize), to: &packet)
+        appendUInt32(UInt32(frame.data.count), to: &packet)
+        appendUInt64(UInt64(bitPattern: frame.ptsMicroseconds), to: &packet)
+        appendUInt16(UInt16(max(0, min(frame.width, ScreenStreamer.maxWidth))), to: &packet)
+        appendUInt16(UInt16(max(0, min(frame.height, ScreenStreamer.maxHeight))), to: &packet)
         packet.append(frame.data)
         return packet
     }
-}
 
+    private func makeAudioPacket(_ audio: EncodedScreenAudio) -> Data {
+        // PZV1 flag 0x02 denotes mono signed 16-bit little-endian PCM audio.
+        // Width and height are zero for audio packets; the shared timestamp
+        // preserves ordering information across the two media types.
+        var packet = Self.magic
+        packet.append(0x01)
+        packet.append(0x02)
+        appendUInt16(UInt16(Self.headerSize), to: &packet)
+        appendUInt32(UInt32(audio.data.count), to: &packet)
+        appendUInt64(UInt64(bitPattern: audio.ptsMicroseconds), to: &packet)
+        appendUInt16(0, to: &packet)
+        appendUInt16(0, to: &packet)
+        packet.append(audio.data)
+        return packet
+    }
+}
 private func appendUInt16(
     _ value: UInt16,
     to data: inout Data
