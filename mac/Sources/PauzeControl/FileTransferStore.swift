@@ -19,6 +19,8 @@ struct DownloadChunkResponse: Codable {
 enum FileTransferStore {
     static let maximumFileBytes: Int64 = 50 * 1024 * 1024
     static let maximumChunkBytes = 24 * 1024
+    private static let maximumStagedBytes: Int64 = 100 * 1024 * 1024
+    private static let maximumStagingAge: TimeInterval = 24 * 60 * 60
     private static let lock = NSLock()
     private static let fm = FileManager.default
 
@@ -32,6 +34,29 @@ enum FileTransferStore {
     private static func prepare() throws {
         try fm.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try fm.createDirectory(at: stagingURL, withIntermediateDirectories: true)
+    }
+
+    /// Discard abandoned partial uploads and bound disk use by unfinished transfers.
+    private static func cleanupStaging() throws -> Int64 {
+        let urls = try fm.contentsOfDirectory(
+            at: stagingURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )
+        let cutoff = Date().addingTimeInterval(-maximumStagingAge)
+        var remainingBytes: Int64 = 0
+        for url in urls {
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
+            guard values?.isRegularFile == true, url.pathExtension == "part" else {
+                continue
+            }
+            if let modified = values?.contentModificationDate, modified < cutoff {
+                try? fm.removeItem(at: url)
+                continue
+            }
+            remainingBytes += Int64(max(0, values?.fileSize ?? 0))
+        }
+        return remainingBytes
     }
 
     private static func safeFilename(_ name: String) throws -> String {
@@ -72,9 +97,9 @@ enum FileTransferStore {
                             offset: Int64, total: Int64, base64Data: String) throws -> Bool {
         let transferID = try safeTransferID(rawID)
         let filename = try safeFilename(rawName)
-        guard offset >= 0, total >= 0, total <= maximumFileBytes,
+        guard offset >= 0, total >= 0, total <= maximumFileBytes, offset <= total,
               let chunk = Data(base64Encoded: base64Data), chunk.count <= maximumChunkBytes,
-              offset + Int64(chunk.count) <= total else {
+              Int64(chunk.count) <= total - offset else {
             throw NSError(domain: "PauzeControl.Files", code: 400,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid upload size, offset or chunk. Files are limited to 50 MiB."])
         }
@@ -84,6 +109,11 @@ enum FileTransferStore {
         let partial = stagingURL.appendingPathComponent(transferID + ".part")
         let destination = rootURL.appendingPathComponent(filename)
         if offset == 0 {
+            let stagedBytes = try cleanupStaging()
+            guard total <= maximumStagedBytes - min(stagedBytes, maximumStagedBytes) else {
+                throw NSError(domain: "PauzeControl.Files", code: 413,
+                              userInfo: [NSLocalizedDescriptionKey: "Temporary upload storage is full. Finish or retry later after abandoned uploads are cleaned up."])
+            }
             guard !fm.fileExists(atPath: partial.path) else {
                 throw NSError(domain: "PauzeControl.Files", code: 409,
                               userInfo: [NSLocalizedDescriptionKey: "An upload with this transfer ID is already in progress."])
