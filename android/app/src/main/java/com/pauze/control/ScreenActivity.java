@@ -34,6 +34,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class ScreenActivity extends Activity
@@ -69,6 +71,9 @@ public final class ScreenActivity extends Activity
     private static final int AUDIO_QUEUE_CAPACITY = 12;
     private final ArrayBlockingQueue<byte[]> audioBuffers =
             new ArrayBlockingQueue<>(AUDIO_QUEUE_CAPACITY);
+    // Keep pointer/typing actions ordered and avoid spawning a thread per touch.
+    private final ExecutorService remoteInputExecutor =
+            Executors.newSingleThreadExecutor();
     private final Object audioLock = new Object();
     private AudioTrack audioTrack;
     private Thread audioPlaybackThread;
@@ -1009,25 +1014,34 @@ public final class ScreenActivity extends Activity
     }
 
     private void sendRemoteInput(JSONObject input) {
-        new Thread(() -> {
-            try {
-                ApiClient.Result result = ApiClient.post(
-                        host, token, "/v1/screen/input", input.toString());
-                if (result.code < 200 || result.code >= 300) {
-                    String message = "Mac rejected remote input.";
-                    try { message = new JSONObject(result.body).optString("error", message); }
-                    catch (Exception ignored) { }
-                    final String error = message;
+        try {
+            remoteInputExecutor.execute(() -> {
+                try {
+                    ApiClient.Result result = ApiClient.post(
+                            host, token, "/v1/screen/input", input.toString());
+                    if (result.code < 200 || result.code >= 300) {
+                        String message = "Mac rejected remote input (HTTP " + result.code + ").";
+                        try { message = new JSONObject(result.body).optString("error", message); }
+                        catch (Exception ignored) { }
+                        final String error = message;
+                        runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            liveStatus.setText("CONTROL ERROR");
+                            Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                        });
+                    }
+                } catch (Exception error) {
                     runOnUiThread(() -> {
-                        liveStatus.setText("CONTROL ERROR");
-                        Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                        if (isFinishing() || isDestroyed()) return;
+                        Toast.makeText(this, "Could not send input to Mac: "
+                                + (error.getMessage() == null ? "connection failed" : error.getMessage()),
+                                Toast.LENGTH_SHORT).show();
                     });
                 }
-            } catch (Exception error) {
-                runOnUiThread(() -> Toast.makeText(
-                        this, "Could not send input to Mac.", Toast.LENGTH_SHORT).show());
-            }
-        }, "PauzeControl-RemoteInput").start();
+            });
+        } catch (RuntimeException rejected) {
+            // Activity is tearing down; no more control requests should be queued.
+        }
     }
 
     private void showTextInput() {
@@ -1403,6 +1417,7 @@ public final class ScreenActivity extends Activity
         }
 
         stopAudioPlayback();
+        remoteInputExecutor.shutdownNow();
         super.onDestroy();
     }
 }
