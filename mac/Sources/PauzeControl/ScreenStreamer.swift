@@ -580,6 +580,20 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 
+    private func timestampMicroseconds(from presentationTime: CMTime) -> Int64 {
+        let seconds = CMTimeGetSeconds(presentationTime)
+        let microseconds = seconds * 1_000_000
+        guard presentationTime.isValid,
+              seconds.isFinite,
+              seconds >= 0,
+              microseconds.isFinite,
+              microseconds < Double(Int64.max)
+        else {
+            return Int64((CACurrentMediaTime() * 1_000_000).rounded())
+        }
+        return Int64(microseconds.rounded())
+    }
+
     private func handleCapturedAudio(_ sampleBuffer: CMSampleBuffer) {
         guard CMSampleBufferIsValid(sampleBuffer),
               wantsAudioCapture,
@@ -707,10 +721,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         }
 
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        let seconds = CMTimeGetSeconds(presentationTime)
-        let pts = presentationTime.isValid && seconds.isFinite && seconds >= 0
-            ? Int64((seconds * 1_000_000).rounded())
-            : Int64((CACurrentMediaTime() * 1_000_000).rounded())
+        let pts = timestampMicroseconds(from: presentationTime)
         let packet = EncodedScreenAudio(data: pcm, ptsMicroseconds: max(0, pts))
 
         for subscriber in subscribers.values {
@@ -765,8 +776,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             prefixed.append(accessUnit)
             accessUnit = prefixed
         }
-        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        let ptsMicroseconds = pts.isValid ? Int64((CMTimeGetSeconds(pts) * 1_000_000).rounded()) : Int64((CACurrentMediaTime() * 1_000_000).rounded())
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let ptsMicroseconds = timestampMicroseconds(from: presentationTime)
         let frame = EncodedScreenFrame(data: accessUnit, width: encoderWidth, height: encoderHeight, ptsMicroseconds: max(0, ptsMicroseconds), keyFrame: containsIDR)
         queue.async {
             guard !self.subscribers.isEmpty else { return }
