@@ -25,7 +25,7 @@ PauzeControl is made up of two parts: an Android app you use as the controller, 
 Use it to check your Mac's status, control common system actions, view or interact with its screen, and move selected text or files between devices. The v1.6.0 update adds Device Studio for multi-Mac profiles and personalisation, plus manual clipboard transfer, file transfer, and audio-device selection.
 
 > **Current download:** [PauzeControl v1.5.0 Stable APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.5.0/PauzeControl-v1.5.0.apk) · [v1.5.0 release notes](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0)  
-> **About v1.6.0:** the updated source is on `main`. Until the v1.6.0 beta APK is published, build the Android app from source using the instructions below to try the new features. The v1.5.0 APK does not include them.
+> **v1.6.0 Beta 1:** [release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) · [direct APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.6.0-beta.1/PauzeControl-v1.6.0-debug.apk). GitHub Actions builds and attaches the beta package when the release-preparation commit reaches `main`. If the assets have not appeared yet, build v1.6.0 from source using the steps below. The v1.5.0 APK does not include these features.
 
 ## Features
 
