@@ -4,9 +4,11 @@
 
 PauzeControl consists of an Android controller and a native macOS agent. They communicate directly over a private Tailscale network; the project does not require a hosted control backend.
 
-> **Downloads:** [PauzeControl v1.4.0 Debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.4.0-beta.1/PauzeControl-v1.4.0-debug.apk) · [v1.4.0 Stable GitHub release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0) · [v1.4.0 Beta release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0-beta.1).
+> **Latest APK:** [PauzeControl v1.5.0 Stable](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.5.0/PauzeControl-v1.5.0.apk) · [v1.5.0 Stable release notes](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0) · [v1.5.0 Beta APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.5.0-beta.1/PauzeControl-v1.5.0-debug.apk).
 >
-> **Signing:** Both channel APKs are debug-signed direct GitHub downloads. The stable channel is not a production-signed or Google Play release. See [Build notes](docs/BUILD_NOTES.md).
+> **Release scope:** v1.5.0 updates the Android app design and live-screen zoom only. No files under `mac/` changed; the Mac agent does not need a source-code update.
+>
+> **Signing:** Both channel APKs are debug-signed direct GitHub downloads. The stable channel is not a production-signed or Google Play release. Android may reject an in-place update if the signing certificate differs from the installed APK. See [Build notes](docs/BUILD_NOTES.md).
 
 ## Features
 
@@ -15,7 +17,7 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 - Connection card and live macOS system dashboard.
 - Remote restriction/allow commands, lock, sleep, restart, shutdown, mute/unmute, and volume control.
 - Connection status and automatic refresh while the app is foregrounded.
-- PauzeControl application icon and dark control-center UI.
+- PauzeControl application icon and PauzeX Developments Skin Color Base theme (warm paper, skin, clay, and ink colors).
 
 ### Live screen
 - Native macOS display capture through ScreenCaptureKit.
@@ -23,6 +25,7 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 - Android hardware decoding through MediaCodec.
 - Full-screen viewer with a manual quality selector and reconnect controls.
 - Aspect-ratio-preserving viewer with separate read-only VIEW and interactive CONTROL modes.
+- Client-side zoom up to 3.0× with pinch-to-zoom, two-finger panning, plus/minus controls, and reset. Zoom does not change the Mac encoder or require a Mac source update.
 
 Manual quality targets:
 
@@ -69,12 +72,11 @@ Use only on devices you own or are explicitly authorized to administer.
 
 ## Build and release
 
-The project has separate CI workflows for:
-- Android debug builds (Build Android).
-- macOS package build/type-check plus Swift syntax checks (Validate macOS).
-- Android beta/debug and stable GitHub channel APKs, triggered by the `v1.4.0` release tag. Both are currently debug-signed; production release signing requires the project’s private release keystore.
+The project has CI workflows for Android debug builds (Build Android) and macOS package build/type-check plus Swift syntax checks (Validate macOS).
 
-A green debug build does not mean a production-signed APK has been generated. Signing setup and release limitations are documented in **[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)**.
+The v1.5.0 Android-only design release was built and published by [GitHub Actions](https://github.com/PauzeDevs/PauzeControl/actions/runs/38735038129). The workflow built with JDK 17, Gradle 8.9, and Android SDK Platform 35, verified the APK archive and signature, generated SHA-256 checksums, and uploaded the stable and beta APK assets. It explicitly checked that no `mac/` source files changed and logged that the Mac does not need a source update.
+
+Both published channels are debug-signed. A green build does not mean a production-signed APK has been generated; see **[Build notes](docs/BUILD_NOTES.md)** for signing and installation limitations.
 
 ## Security model and limitations
 
