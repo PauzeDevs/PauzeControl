@@ -25,7 +25,7 @@ PauzeControl is made up of two parts: an Android app you use as the controller, 
 Use it to check your Mac's status, control common system actions, view or interact with its screen, and move selected text or files between devices. The v1.6.0 update adds Device Studio for multi-Mac profiles and personalisation, plus manual clipboard transfer, file transfer, and audio-device selection.
 
 > **Current download:** [PauzeControl v1.5.0 Stable APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.5.0/PauzeControl-v1.5.0.apk) · [v1.5.0 release notes](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0)  
-> **v1.6.0 Beta 1:** [release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) · [direct APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.6.0-beta.1/PauzeControl-v1.6.0-debug.apk). GitHub Actions builds and attaches the beta package when the release-preparation commit reaches `main`. If the assets have not appeared yet, build v1.6.0 from source using the steps below. The v1.5.0 APK does not include these features.
+> **v1.6.0 Beta 1:** [release page](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) · [direct APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.6.0-beta.1/PauzeControl-v1.6.0-debug.apk). The beta APK is published and debug-signed; it does not include the live system-audio development feature described below.
 
 ## Features
 
@@ -49,7 +49,7 @@ Use it to check your Mac's status, control common system actions, view or intera
 - Quality targets from 144p through 1080p, with 60 FPS options at 720p and 1080p.
 - Pinch-to-zoom, panning, zoom buttons, and reset.
 
-> **Live audio availability:** this feature is on the live-audio development branch. Build both the Mac agent and Android app from that same branch. Previously published v1.5.0 Stable and v1.6.0 Beta 1 APKs do not contain this audio feature yet. Follow [the audio build and test guide](docs/LIVE_SCREEN_AUDIO.md).
+> **Live audio availability:** this feature is being developed on `feat/live-screen-system-audio`. Build both the Mac agent and Android app from that same branch. Previously published v1.5.0 Stable and v1.6.0 Beta 1 APKs do not contain this audio feature yet. Follow [the audio build and test guide](docs/LIVE_SCREEN_AUDIO.md).
 
 Actual frame rate and image quality depend on the Mac, display size, temperature, and network conditions.
 
@@ -150,7 +150,7 @@ There are two options.
 
 ### Option A — Download a published APK
 
-Use the [latest published release](https://github.com/PauzeDevs/PauzeControl/releases). The currently published stable build is v1.5.0; it does **not** include the Device Studio features introduced in v1.6.0. Use Option B to build and test the new source before the v1.6.0 beta is available.
+Use the [latest published release](https://github.com/PauzeDevs/PauzeControl/releases). The stable build remains v1.5.0, while [v1.6.0 Beta 1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) contains the Device Studio additions. Neither published APK includes live system-audio streaming yet. To test that feature, build both apps from the same development branch as described in [the audio test guide](docs/LIVE_SCREEN_AUDIO.md).
 
 After downloading an APK to your phone, open it and follow Android's prompt to allow installation from that source. Only install APKs from a source you trust.
 
