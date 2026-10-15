@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#272747" />
+    <solid android:color="#28211E" />
     <corners android:radius="12dp" />
     <stroke
         android:width="1dp"
-        android:color="#6256E8" />
+        android:color="#BD775D" />
 </shape>
