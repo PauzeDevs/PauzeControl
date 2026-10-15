@@ -1,16 +1,16 @@
-name: PauzeControl Android Releases
+name: PauzeControl Android Beta Release
 
 on:
   push:
     tags:
-      - 'v1.4.0'
+      - 'v1.6.0-beta.1'
 
 permissions:
   contents: write
 
 jobs:
   build-and-release:
-    name: Build and publish v1.4.0 debug and stable GitHub channels
+    name: Build and publish v1.6.0 Beta 1
     runs-on: ubuntu-latest
     steps:
       - name: Check out tagged source
@@ -46,27 +46,25 @@ jobs:
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose "$APK"
 
-          mkdir -p dist/debug dist/stable
-          cp "$APK" dist/debug/PauzeControl-v1.4.0-debug.apk
-          cp "$APK" dist/stable/PauzeControl-v1.4.0.apk
-          (cd dist/debug && sha256sum PauzeControl-v1.4.0-debug.apk > SHA256SUMS.txt)
-          (cd dist/stable && sha256sum PauzeControl-v1.4.0.apk > SHA256SUMS.txt)
+          mkdir -p dist
+          cp "$APK" dist/PauzeControl-v1.6.0-debug.apk
+          (cd dist && sha256sum PauzeControl-v1.6.0-debug.apk > SHA256SUMS.txt)
 
-      - name: Upload verified channel APKs
+      - name: Upload verified APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PauzeControl-v1.4.0-debug-and-stable
+          name: PauzeControl-v1.6.0-beta.1
           path: dist/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
 
-      - name: Publish beta/debug release
+      - name: Publish beta release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.0-beta.1
+          tag_name: v1.6.0-beta.1
           target_commitish: ${{ github.sha }}
-          name: PauzeControl v1.4.0 Beta 1 — Debug APK
-          body_path: docs/RELEASE_NOTES_v1.4.0-debug.md
+          name: PauzeControl v1.6.0 Beta 1 — Device Studio Update
+          body_path: docs/RELEASE_NOTES_v1.6.0.md
           prerelease: true
           draft: false
           make_latest: false
@@ -74,22 +72,5 @@ jobs:
           fail_on_unmatched_files: true
           generate_release_notes: false
           files: |
-            dist/debug/PauzeControl-v1.4.0-debug.apk
-            dist/debug/SHA256SUMS.txt
-
-      - name: Publish stable GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.4.0
-          target_commitish: ${{ github.sha }}
-          name: PauzeControl v1.4.0 — Stable GitHub Channel
-          body_path: docs/RELEASE_NOTES_v1.4.0-stable.md
-          prerelease: false
-          draft: false
-          make_latest: true
-          overwrite_files: true
-          fail_on_unmatched_files: true
-          generate_release_notes: false
-          files: |
-            dist/stable/PauzeControl-v1.4.0.apk
-            dist/stable/SHA256SUMS.txt
+            dist/PauzeControl-v1.6.0-debug.apk
+            dist/SHA256SUMS.txt
