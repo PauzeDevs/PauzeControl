@@ -2,14 +2,15 @@ name: PauzeControl Android Beta Release
 
 on:
   push:
-    tags:
-      - 'v1.6.0-beta.1'
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   build-and-release:
+    if: contains(github.event.head_commit.message, '[release-v1.6.0-beta]')
     name: Build and publish v1.6.0 Beta 1
     runs-on: ubuntu-latest
     steps:
