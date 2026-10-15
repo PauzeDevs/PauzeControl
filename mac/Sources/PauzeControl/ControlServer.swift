@@ -818,6 +818,7 @@ private final class ScreenClient {
     private var subscriberID: UUID?
     private var pendingVideo: EncodedScreenFrame?
     private var pendingAudio: [EncodedScreenAudio] = []
+    private var lastSentWasAudio = false
     private var sending = false
     private var closed = false
 
@@ -917,11 +918,18 @@ private final class ScreenClient {
         guard !closed else { return }
 
         let payload: Data
-        if !pendingAudio.isEmpty {
+        // When both queues are populated, alternate packet types so continuous
+        // audio cannot starve the latest video frame on a constrained network.
+        if !pendingAudio.isEmpty && (pendingVideo == nil || !lastSentWasAudio) {
             payload = makeAudioPacket(pendingAudio.removeFirst())
+            lastSentWasAudio = true
         } else if let frame = pendingVideo {
             pendingVideo = nil
             payload = makeVideoPacket(frame)
+            lastSentWasAudio = false
+        } else if !pendingAudio.isEmpty {
+            payload = makeAudioPacket(pendingAudio.removeFirst())
+            lastSentWasAudio = true
         } else {
             sending = false
             return
