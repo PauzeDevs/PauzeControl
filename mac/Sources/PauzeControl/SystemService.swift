@@ -229,10 +229,11 @@ enum SystemService {
 
     private static func run(_ executable: String, _ arguments: [String]) throws {
         let process = Process()
+        let errorPipe = Pipe()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardError = errorPipe
 
         do {
             try process.run()
@@ -240,10 +241,12 @@ enum SystemService {
             throw NSError(
                 domain: "PauzeControl.System",
                 code: 500,
-                userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start."]
+                userInfo: [NSLocalizedDescriptionKey: "The requested Mac system action could not start: \\(error.localizedDescription)"]
             )
         }
 
+        // Drain stderr while the subprocess is running so Apple Events/TCC
+        // failures can be reported to the Android client instead of hidden.
         let timeout = DispatchWorkItem {
             if process.isRunning {
                 process.terminate()
@@ -253,14 +256,20 @@ enum SystemService {
             deadline: .now() + 10,
             execute: timeout
         )
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         timeout.cancel()
 
         guard process.terminationStatus == 0 else {
+            let diagnostic = String(data: errorData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let detail = diagnostic.isEmpty
+                ? "macOS rejected the action or it timed out."
+                : String(diagnostic.prefix(500))
             throw NSError(
                 domain: "PauzeControl.System",
                 code: 500,
-                userInfo: [NSLocalizedDescriptionKey: "macOS rejected or timed out the requested system action."]
+                userInfo: [NSLocalizedDescriptionKey: "macOS system action failed: \\(detail)"]
             )
         }
     }
