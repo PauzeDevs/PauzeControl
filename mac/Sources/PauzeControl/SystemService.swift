@@ -110,8 +110,8 @@ enum SystemService {
         case "sleep": try run("/usr/bin/pmset", ["sleepnow"])
         case "restart": try appleScript(#"tell application "System Events" to restart"#)
         case "shutdown": try appleScript(#"tell application "System Events" to shut down"#)
-        case "mute": try appleScript("set volume with output muted true")
-        case "unmute": try appleScript("set volume with output muted false")
+        case "mute": try appleScript("set volume output muted true")
+        case "unmute": try appleScript("set volume output muted false")
         case "volume":
             guard let value, (0...100).contains(value) else {
                 throw NSError(domain: "PauzeControl.System", code: 400, userInfo: [NSLocalizedDescriptionKey: "Volume must be between 0 and 100."])
