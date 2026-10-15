@@ -20,6 +20,7 @@ enum FileTransferStore {
     static let maximumFileBytes: Int64 = 50 * 1024 * 1024
     static let maximumChunkBytes = 24 * 1024
     private static let maximumStagedBytes: Int64 = 100 * 1024 * 1024
+    private static let maximumConcurrentStagedUploads = 16
     private static let maximumStagingAge: TimeInterval = 24 * 60 * 60
     private static let lock = NSLock()
     private static let fm = FileManager.default
@@ -37,7 +38,7 @@ enum FileTransferStore {
     }
 
     /// Discard abandoned partial uploads and bound disk use by unfinished transfers.
-    private static func cleanupStaging() throws -> Int64 {
+    private static func cleanupStaging() throws -> (bytes: Int64, count: Int) {
         let urls = try fm.contentsOfDirectory(
             at: stagingURL,
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey],
@@ -45,6 +46,7 @@ enum FileTransferStore {
         )
         let cutoff = Date().addingTimeInterval(-maximumStagingAge)
         var remainingBytes: Int64 = 0
+        var remainingCount = 0
         for url in urls {
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
             if values?.isSymbolicLink == true {
@@ -59,8 +61,9 @@ enum FileTransferStore {
                 continue
             }
             remainingBytes += Int64(max(0, values?.fileSize ?? 0))
+            remainingCount += 1
         }
-        return remainingBytes
+        return (remainingBytes, remainingCount)
     }
 
     private static func safeFilename(_ name: String) throws -> String {
@@ -116,9 +119,19 @@ enum FileTransferStore {
             throw NSError(domain: "PauzeControl.Files", code: 409,
                           userInfo: [NSLocalizedDescriptionKey: "Upload staging path must not be a symbolic link."])
         }
+        // Recalculate staging use for every chunk, not just the first one:
+        // otherwise several started uploads could collectively exceed the cap.
+        let staging = try cleanupStaging()
+        guard Int64(chunk.count) <= maximumStagedBytes - min(staging.bytes, maximumStagedBytes) else {
+            throw NSError(domain: "PauzeControl.Files", code: 413,
+                          userInfo: [NSLocalizedDescriptionKey: "Temporary upload storage is full. Finish or retry later after abandoned uploads are cleaned up."])
+        }
         if offset == 0 {
-            let stagedBytes = try cleanupStaging()
-            guard total <= maximumStagedBytes - min(stagedBytes, maximumStagedBytes) else {
+            guard staging.count < maximumConcurrentStagedUploads else {
+                throw NSError(domain: "PauzeControl.Files", code: 429,
+                              userInfo: [NSLocalizedDescriptionKey: "Too many upload sessions are in progress. Finish or retry later."])
+            }
+            guard total <= maximumStagedBytes - min(staging.bytes, maximumStagedBytes) else {
                 throw NSError(domain: "PauzeControl.Files", code: 413,
                               userInfo: [NSLocalizedDescriptionKey: "Temporary upload storage is full. Finish or retry later after abandoned uploads are cleaned up."])
             }
