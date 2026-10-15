@@ -564,9 +564,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
               let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
               let basicDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
               basicDescription.pointee.mFormatID == kAudioFormatLinearPCM,
-              basicDescription.pointee.mChannelsPerFrame == 1,
-              let channelCount = Optional(Int(basicDescription.pointee.mChannelsPerFrame)),
-              channelCount == 1
+              basicDescription.pointee.mChannelsPerFrame == 1
         else {
             return
         }
@@ -584,19 +582,17 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         var requiredBufferListSize = 0
         var retainedBlockBuffer: CMBlockBuffer?
-        let sizingStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+        _ = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
             sampleBuffer,
             bufferListSizeNeededOut: &requiredBufferListSize,
             bufferListOut: nil,
             bufferListSize: 0,
             blockBufferAllocator: kCFAllocatorDefault,
             blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
+            flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
             blockBufferOut: &retainedBlockBuffer
         )
-        guard sizingStatus == noErr,
-              requiredBufferListSize >= MemoryLayout<AudioBufferList>.size
-        else {
+        guard requiredBufferListSize >= MemoryLayout<AudioBufferList>.size else {
             return
         }
 
@@ -607,14 +603,16 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         defer { storage.deallocate() }
 
         let audioBufferList = storage.bindMemory(to: AudioBufferList.self, capacity: 1)
+        var filledBufferListSize = 0
+        let allocatedBufferListSize = requiredBufferListSize
         let listStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
             sampleBuffer,
-            bufferListSizeNeededOut: &requiredBufferListSize,
+            bufferListSizeNeededOut: &filledBufferListSize,
             bufferListOut: audioBufferList,
-            bufferListSize: requiredBufferListSize,
+            bufferListSize: allocatedBufferListSize,
             blockBufferAllocator: kCFAllocatorDefault,
             blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
+            flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
             blockBufferOut: &retainedBlockBuffer
         )
         guard listStatus == noErr,
