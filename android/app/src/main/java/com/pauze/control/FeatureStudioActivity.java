@@ -244,6 +244,13 @@ public final class FeatureStudioActivity extends Activity {
                 if (name.equalsIgnoreCase(entry.optString("name")) && deviceHost.equalsIgnoreCase(entry.optString("host")))
                     id = entry.optString("id");
             }
+            String existingToken = "";
+            if (id != null && !id.isEmpty()) {
+                String existingKey = "device_" + id.replace("-", "");
+                try { existingToken = store.getSecret(existingKey); } catch (Exception ignored) {}
+            }
+            boolean updatingActiveProfile = id != null && !id.isEmpty()
+                    && deviceHost.equalsIgnoreCase(activeHost) && activeToken.equals(existingToken);
             if (id == null || id.isEmpty()) id = UUID.randomUUID().toString();
             String secretKey = "device_" + id.replace("-", "");
             store.putSecret(secretKey, deviceSecret);
@@ -256,7 +263,7 @@ public final class FeatureStudioActivity extends Activity {
             if (!replaced) next.put(replacement);
             getSharedPreferences(PROFILE_PREFS, MODE_PRIVATE).edit().putString("profiles", next.toString()).apply();
             renderProfiles(); toast("Device profile saved securely.");
-            if (activeHost.isEmpty()) activateProfile(replacement);
+            if (activeHost.isEmpty() || updatingActiveProfile) activateProfile(replacement);
         } catch (Exception error) { toast("Could not save profile: " + message(error)); }
     }
 
@@ -287,14 +294,51 @@ public final class FeatureStudioActivity extends Activity {
 
     private void removeProfile(JSONObject profile) {
         try {
-            JSONArray old = readProfiles(), next = new JSONArray(); String key = profile.optString("secret_key");
+            JSONArray old = readProfiles(), next = new JSONArray();
+            String key = profile.optString("secret_key");
+            String profileHost = profile.optString("host", "").trim();
+            String profileToken = "";
+            try { profileToken = store.getSecret(key); } catch (Exception ignored) {}
+            boolean removingActiveProfile = !profileToken.isEmpty()
+                    && profileHost.equalsIgnoreCase(activeHost)
+                    && activeToken.equals(profileToken);
+
             for (int i = 0; i < old.length(); i++) {
                 JSONObject entry = old.getJSONObject(i);
                 if (!profile.optString("id").equals(entry.optString("id"))) next.put(entry);
             }
-            getSharedPreferences(PROFILE_PREFS, MODE_PRIVATE).edit().putString("profiles", next.toString()).apply();
-            store.removeSecret(key); renderProfiles(); toast("Profile removed.");
-        } catch (Exception error) { toast("Could not remove profile: " + message(error)); }
+            if (!getSharedPreferences(PROFILE_PREFS, MODE_PRIVATE).edit()
+                    .putString("profiles", next.toString()).commit()) {
+                throw new IllegalStateException("Could not save the updated device profile list.");
+            }
+            store.removeSecret(key);
+
+            if (removingActiveProfile) {
+                store.clearToken();
+                getSharedPreferences(CONNECTION_PREFS, MODE_PRIVATE).edit().remove("host").commit();
+                activeHost = "";
+                activeToken = "";
+                if (host != null) host.setText("");
+                if (secret != null) secret.setText("");
+                if (profileName != null) profileName.setText("");
+                outputs.clear();
+                inputs.clear();
+                if (files != null) {
+                    files.removeAllViews();
+                    files.addView(text("Select an active Mac to see transferred files.", 12, false, true), match());
+                }
+                if (transferText != null) transferText.setText("No active Mac selected.");
+                if (audioText != null) audioText.setText("Select an active Mac to inspect audio devices.");
+                updateAudioLabels();
+                updateActiveLabel();
+            }
+            renderProfiles();
+            toast(removingActiveProfile
+                    ? "Active profile and its saved connection were removed."
+                    : "Device profile removed.");
+        } catch (Exception error) {
+            toast("Could not remove profile: " + message(error));
+        }
     }
 
     private void activateProfile(JSONObject profile) {
