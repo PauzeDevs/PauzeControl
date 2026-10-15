@@ -21,16 +21,16 @@ enum RemoteInput {
         switch action {
         case "click":
             let point = try screenPoint(payload)
-            postMouse(.mouseMoved, at: point, button: .left)
-            postMouse(.leftMouseDown, at: point, button: .left)
-            postMouse(.leftMouseUp, at: point, button: .left)
+            try postMouse(.mouseMoved, at: point, button: .left)
+            try postMouse(.leftMouseDown, at: point, button: .left)
+            try postMouse(.leftMouseUp, at: point, button: .left)
         case "drag":
             let start = try screenPoint(payload, xKey: "startX", yKey: "startY")
             let end = try screenPoint(payload, xKey: "x", yKey: "y")
-            postMouse(.mouseMoved, at: start, button: .left)
-            postMouse(.leftMouseDown, at: start, button: .left)
-            postMouse(.leftMouseDragged, at: end, button: .left)
-            postMouse(.leftMouseUp, at: end, button: .left)
+            try postMouse(.mouseMoved, at: start, button: .left)
+            try postMouse(.leftMouseDown, at: start, button: .left)
+            try postMouse(.leftMouseDragged, at: end, button: .left)
+            try postMouse(.leftMouseUp, at: end, button: .left)
         case "scroll":
             let point = try screenPoint(payload)
             guard let deltaY = payload["deltaY"] as? NSNumber,
@@ -53,7 +53,7 @@ enum RemoteInput {
                   !text.isEmpty,
                   text.utf16.count <= 512
             else { throw invalidRequest() }
-            postText(text)
+            try postText(text)
         default:
             throw invalidRequest()
         }
@@ -79,26 +79,38 @@ enum RemoteInput {
         )
     }
 
-    private static func postMouse(_ type: CGEventType, at point: CGPoint, button: CGMouseButton) {
-        guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return }
+    private static func postMouse(_ type: CGEventType, at point: CGPoint, button: CGMouseButton) throws {
+        guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: button) else {
+            throw NSError(
+                domain: "PauzeControl.RemoteInput",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "macOS could not create the requested mouse event."]
+            )
+        }
         event.post(tap: .cghidEventTap)
     }
 
-    private static func postText(_ text: String) {
+    private static func postText(_ text: String) throws {
         var batch = ""
         for character in text {
             if batch.utf16.count + String(character).utf16.count > 20 {
-                postTextBatch(batch)
+                try postTextBatch(batch)
                 batch = ""
             }
             batch.append(character)
         }
-        if !batch.isEmpty { postTextBatch(batch) }
+        if !batch.isEmpty { try postTextBatch(batch) }
     }
 
-    private static func postTextBatch(_ text: String) {
+    private static func postTextBatch(_ text: String) throws {
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-              let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else { return }
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+            throw NSError(
+                domain: "PauzeControl.RemoteInput",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "macOS could not create the requested keyboard event."]
+            )
+        }
         let units = Array(text.utf16)
         units.withUnsafeBufferPointer { buffer in
             down.keyboardSetUnicodeString(stringLength: units.count, unicodeString: buffer.baseAddress)
