@@ -191,9 +191,7 @@ public final class MainActivity extends Activity {
         );
         restrictionControl.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        macRestricted
-                                ? "/v1/allow"
-                                : "/v1/restrict"
+                        view.isChecked() ? "/v1/restrict" : "/v1/allow"
                 )
         );
 
@@ -234,9 +232,7 @@ public final class MainActivity extends Activity {
         );
         muteButton.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        macMuted
-                                ? "/v1/unmute"
-                                : "/v1/mute"
+                        view.isChecked() ? "/v1/mute" : "/v1/unmute"
                 )
         );
 
