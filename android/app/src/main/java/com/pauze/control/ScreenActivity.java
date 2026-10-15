@@ -1199,12 +1199,18 @@ public final class ScreenActivity extends Activity
                     audioPlaybackRunning &&
                     isCurrentAudioTrack(playbackTrack) &&
                     !Thread.currentThread().isInterrupted()) {
-                int written = playbackTrack.write(
-                        chunk,
-                        offset,
-                        chunk.length - offset,
-                        AudioTrack.WRITE_BLOCKING
-                );
+                final int written;
+                try {
+                    written = playbackTrack.write(
+                            chunk,
+                            offset,
+                            chunk.length - offset,
+                            AudioTrack.WRITE_BLOCKING
+                    );
+                } catch (IllegalStateException releasedDuringStop) {
+                    // Audio may be disabled while a blocking write is active.
+                    break;
+                }
                 if (written < 0) break;
                 if (written == 0) break;
                 offset += written;
