@@ -1238,8 +1238,19 @@ public final class ScreenActivity extends Activity
                     // Audio may be disabled while a blocking write is active.
                     break;
                 }
-                if (written < 0) break;
-                if (written == 0) break;
+                if (written < 0) {
+                    failAudioPlayback(playbackTrack, written);
+                    return;
+                }
+                if (written == 0) {
+                    try {
+                        Thread.sleep(5);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    continue;
+                }
                 offset += written;
             }
         }
@@ -1249,6 +1260,21 @@ public final class ScreenActivity extends Activity
         synchronized (audioLock) {
             return audioTrack == expectedTrack;
         }
+    }
+
+    private void failAudioPlayback(AudioTrack failedTrack, int errorCode) {
+        synchronized (audioLock) {
+            if (audioTrack != failedTrack) return;
+            audioPlaybackUnavailable = true;
+        }
+        runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            Toast.makeText(this,
+                    "Live audio playback stopped (AudioTrack error " + errorCode
+                            + "). Toggle audio off and on to retry.",
+                    Toast.LENGTH_LONG).show();
+        });
+        stopAudioPlayback();
     }
 
     private void stopAudioPlayback() {
