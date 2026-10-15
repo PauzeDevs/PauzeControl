@@ -122,6 +122,7 @@ public final class MainActivity extends Activity {
         setupNavigation();
         setupActions();
         Personalization.apply(this);
+        migrateLegacyConnection();
         loadSavedConnection();
     }
 
@@ -538,6 +539,24 @@ public final class MainActivity extends Activity {
                                 .start()
                 )
                 .start();
+    }
+
+    private void migrateLegacyConnection() {
+        android.content.SharedPreferences connection =
+                getSharedPreferences("pauze_connection", MODE_PRIVATE);
+        if (connection.contains("host")) {
+            return;
+        }
+
+        // Before Device Studio, MainActivity used Activity.getPreferences(), which
+        // stores its values under the activity's local class name. Preserve that host
+        // on upgrade instead of leaving existing installations disconnected.
+        android.content.SharedPreferences legacy =
+                getSharedPreferences(getLocalClassName(), MODE_PRIVATE);
+        String legacyHost = legacy.getString("host", "");
+        if (legacyHost != null && !legacyHost.trim().isEmpty()) {
+            connection.edit().putString("host", legacyHost.trim()).apply();
+        }
     }
 
     private void loadSavedConnection() {
