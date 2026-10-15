@@ -12,7 +12,7 @@ This guide covers local builds, signing, installation checks, and release verifi
 - **Android toolchain:** JDK 17 and Gradle 8.9.
 - **Mac minimum:** macOS 14 or later.
 
-A successful debug build is not a production-signed release build. Both the current published stable channel and the planned beta direct-download package are/debug builds; neither is a Google Play release.
+A successful debug build is not a production-signed release build. Both the current published stable channel and the planned beta direct-download package are debug builds; neither is a Google Play release.
 
 ## Android debug build
 
