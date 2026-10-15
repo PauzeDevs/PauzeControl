@@ -20,16 +20,31 @@ final class RestrictionManager: NSObject {
 
     func start() {
         guard restricted else { return }
-        activate()
+        if !activate() {
+            // Never leave a persisted "restricted" state when macOS has not
+            // granted the input-monitoring capability required to enforce it.
+            restricted = false
+            stateStore.isRestricted = false
+            deactivate()
+            NSLog("[PauzeControl] Restriction could not start: input-blocking event tap is unavailable.")
+        }
     }
 
     func restrict() -> CommandResponse {
-        DispatchQueue.main.sync {
+        let activated = DispatchQueue.main.sync {
             restricted = true
             stateStore.isRestricted = true
-            activate()
+            let ready = activate()
+            if !ready {
+                restricted = false
+                stateStore.isRestricted = false
+                deactivate()
+            }
+            return ready
         }
-
+        if !activated {
+            NSLog("[PauzeControl] Restriction request rejected: input-blocking event tap is unavailable.")
+        }
         return response("RESTRICT")
     }
 
@@ -52,18 +67,25 @@ final class RestrictionManager: NSObject {
         )
     }
 
-    private func activate() {
+    @discardableResult
+    private func activate() -> Bool {
         if windows.isEmpty {
             createWindows()
         }
 
         installEventTapIfNeeded()
-        NSApp.activate(ignoringOtherApps: true)
+        guard inputBlockingEnabled, eventTap != nil, eventSource != nil else {
+            windows.forEach { $0.orderOut(nil) }
+            windows.removeAll()
+            return false
+        }
 
+        NSApp.activate(ignoringOtherApps: true)
         windows.forEach {
             $0.orderFrontRegardless()
             $0.makeKey()
         }
+        return true
     }
 
     private func deactivate() {
@@ -140,24 +162,25 @@ final class RestrictionManager: NSObject {
             return
         }
 
-        eventTap = tap
-        inputBlockingEnabled = true
-
-        eventSource = CFMachPortCreateRunLoopSource(
+        guard let source = CFMachPortCreateRunLoopSource(
             kCFAllocatorDefault,
             tap,
             0
-        )
-
-        if let source = eventSource {
-            CFRunLoopAddSource(
-                CFRunLoopGetMain(),
-                source,
-                .commonModes
-            )
+        ) else {
+            CFMachPortInvalidate(tap)
+            inputBlockingEnabled = false
+            return
         }
 
+        eventTap = tap
+        eventSource = source
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            source,
+            .commonModes
+        )
         CGEvent.tapEnable(tap: tap, enable: true)
+        inputBlockingEnabled = true
     }
 
     private func removeEventTap() {
