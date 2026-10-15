@@ -69,8 +69,21 @@ public final class ScreenActivity extends Activity
 
     private static final int SYSTEM_AUDIO_SAMPLE_RATE = 24_000;
     private static final int AUDIO_QUEUE_CAPACITY = 12;
-    private final ArrayBlockingQueue<byte[]> audioBuffers =
+    private static final long PLAYOUT_START_BUFFER_NS = 120_000_000L;
+    private static final long AUDIO_OUTPUT_PREBUFFER_NS = 40_000_000L;
+    private static final class AudioChunk {
+        final byte[] pcm;
+        final long presentationTimeUs;
+        AudioChunk(byte[] pcm, long presentationTimeUs) {
+            this.pcm = pcm;
+            this.presentationTimeUs = presentationTimeUs;
+        }
+    }
+    private final ArrayBlockingQueue<AudioChunk> audioBuffers =
             new ArrayBlockingQueue<>(AUDIO_QUEUE_CAPACITY);
+    private final Object presentationTimelineLock = new Object();
+    private long timelineBasePtsUs = -1L;
+    private long timelineBaseNanoTime;
     // Keep pointer/typing actions ordered and avoid spawning a thread per touch.
     private final ExecutorService remoteInputExecutor =
             Executors.newSingleThreadExecutor();
@@ -376,6 +389,7 @@ public final class ScreenActivity extends Activity
             return;
         }
 
+        resetPresentationTimeline();
         streamError = false;
         hasReceivedVideoPacket = false;
         frameCount = 0;
@@ -427,6 +441,8 @@ public final class ScreenActivity extends Activity
             return;
         }
 
+        // Establish the common presentation timeline before queueing the chunk.
+        presentationTimeNanos(ptsMicroseconds);
         try {
             ensureAudioPlayback();
         } catch (Exception error) {
@@ -442,9 +458,10 @@ public final class ScreenActivity extends Activity
 
         // Bound queued latency. When the phone or network stalls, drop the
         // oldest audio chunk rather than building up seconds of delayed sound.
-        if (!audioBuffers.offer(pcmS16LittleEndian)) {
+        AudioChunk chunk = new AudioChunk(pcmS16LittleEndian, Math.max(0L, ptsMicroseconds));
+        if (!audioBuffers.offer(chunk)) {
             audioBuffers.poll();
-            audioBuffers.offer(pcmS16LittleEndian);
+            audioBuffers.offer(chunk);
         }
     }
 
@@ -468,6 +485,8 @@ public final class ScreenActivity extends Activity
             boolean keyFrame,
             long ptsMicroseconds
     ) {
+        // Establish one client monotonic-clock timeline shared with audio.
+        presentationTimeNanos(ptsMicroseconds);
         Surface surface = decoderSurface;
         hasReceivedVideoPacket = true;
         uiHandler.removeCallbacks(noVideoFrameRunnable);
@@ -659,7 +678,9 @@ public final class ScreenActivity extends Activity
             int outputIndex = activeDecoder.dequeueOutputBuffer(bufferInfo, 0);
 
             if (outputIndex >= 0) {
-                activeDecoder.releaseOutputBuffer(outputIndex, true);
+                long targetNanos = presentationTimeNanos(
+                        Math.max(0L, bufferInfo.presentationTimeUs));
+                activeDecoder.releaseOutputBuffer(outputIndex, targetNanos);
                 continue;
             }
 
@@ -1212,15 +1233,33 @@ public final class ScreenActivity extends Activity
         while (audioPlaybackRunning &&
                 isCurrentAudioTrack(playbackTrack) &&
                 !Thread.currentThread().isInterrupted()) {
-            final byte[] chunk;
+            final AudioChunk audioChunk;
             try {
-                chunk = audioBuffers.poll(250, TimeUnit.MILLISECONDS);
+                audioChunk = audioBuffers.poll(250, TimeUnit.MILLISECONDS);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 break;
             }
-            if (chunk == null) continue;
+            if (audioChunk == null) continue;
 
+            // Pace PCM using the same PTS-to-monotonic mapping used for video.
+            // Queue to AudioTrack slightly early to account for output buffering.
+            long targetNanos = presentationTimeNanos(audioChunk.presentationTimeUs)
+                    - AUDIO_OUTPUT_PREBUFFER_NS;
+            while (audioPlaybackRunning &&
+                    isCurrentAudioTrack(playbackTrack) &&
+                    !Thread.currentThread().isInterrupted()) {
+                long now = System.nanoTime();
+                if (targetNanos <= now) break;
+                try {
+                    TimeUnit.NANOSECONDS.sleep(Math.min(targetNanos - now, 25_000_000L));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+
+            byte[] chunk = audioChunk.pcm;
             int offset = 0;
             while (offset < chunk.length &&
                     audioPlaybackRunning &&
@@ -1253,6 +1292,32 @@ public final class ScreenActivity extends Activity
                 }
                 offset += written;
             }
+        }
+    }
+
+    private void resetPresentationTimeline() {
+        synchronized (presentationTimelineLock) {
+            timelineBasePtsUs = -1L;
+            timelineBaseNanoTime = 0L;
+        }
+        audioBuffers.clear();
+    }
+
+    private long presentationTimeNanos(long ptsUs) {
+        synchronized (presentationTimelineLock) {
+            if (timelineBasePtsUs < 0L) {
+                timelineBasePtsUs = Math.max(0L, ptsUs);
+                timelineBaseNanoTime = System.nanoTime() + PLAYOUT_START_BUFFER_NS;
+            }
+            long deltaUs = Math.max(0L, ptsUs) - timelineBasePtsUs;
+            long deltaNanos = TimeUnit.MICROSECONDS.toNanos(deltaUs);
+            if (deltaNanos > 0L && timelineBaseNanoTime > Long.MAX_VALUE - deltaNanos) {
+                return Long.MAX_VALUE;
+            }
+            if (deltaNanos < 0L && timelineBaseNanoTime < Long.MIN_VALUE - deltaNanos) {
+                return Long.MIN_VALUE;
+            }
+            return timelineBaseNanoTime + deltaNanos;
         }
     }
 
