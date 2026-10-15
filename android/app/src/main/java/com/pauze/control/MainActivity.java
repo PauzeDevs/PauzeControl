@@ -59,6 +59,7 @@ public final class MainActivity extends Activity {
     private SlideActionView restrictionControl;
     private SlideActionView muteButton;
     private boolean macRestricted;
+    private boolean macInputBlockingEnabled;
 
     private SeekBar volumeSeek;
 
@@ -712,10 +713,8 @@ public final class MainActivity extends Activity {
                 new JSONObject(result.body);
 
         updateState(
-                root.optBoolean(
-                        "restricted",
-                        false
-                )
+                root.optBoolean("restricted", false),
+                root.optBoolean("input_blocking_enabled", false)
         );
 
         updateSystem(
@@ -742,19 +741,21 @@ public final class MainActivity extends Activity {
     }
 
     private void updateState(
-            boolean restricted
+            boolean restricted,
+            boolean inputBlockingEnabled
     ) {
         mainHandler.post(
                 () -> {
-                    macRestricted = restricted;
-                    restrictionControl.setText(
-                            "MAC RESTRICTION"
-                    );
-                    restrictionControl.setChecked(
-                            restricted
-                    );
+                    macInputBlockingEnabled = inputBlockingEnabled;
+                    macRestricted = restricted && inputBlockingEnabled;
+                    restrictionControl.setText("MAC RESTRICTION");
+                    restrictionControl.setChecked(macRestricted);
 
-                    if (restricted) {
+                    if (restricted && !inputBlockingEnabled) {
+                        macStateText.setText("Restriction unavailable • input is not blocked");
+                        connectionPill.setText("● RESTRICTION FAILED");
+                        connectionPill.setTextColor(AMBER);
+                    } else if (macRestricted) {
                         macStateText.setText(
                                 "Restricted • awaiting ALLOW"
                         );
