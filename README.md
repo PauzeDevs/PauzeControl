@@ -5,7 +5,7 @@
 
 <p align="center">
   <strong>Control your Mac from your Android device over your private Tailscale network.</strong><br />
-  Live screen streaming, system controls, device profiles, clipboard transfer, file transfer, and audio-device selection.
+  Live screen streaming, optional system-output audio, system controls, device profiles, clipboard transfer, file transfer, and audio-device selection.
 </p>
 
 <p align="center">
@@ -44,8 +44,12 @@ Use it to check your Mac's status, control common system actions, view or intera
 - Streams the Mac display as H.264 using Apple's ScreenCaptureKit and VideoToolbox.
 - Decodes the stream on Android using MediaCodec.
 - VIEW mode is for watching; CONTROL mode supports remote input where macOS permissions allow it.
+- Optional Mac **system-output audio** (music, videos, and app sounds), disabled by default. The agent does not capture microphone input for this feature.
+- The Android viewer has an audio on/off control; long-press it to open local playback volume and mute controls.
 - Quality targets from 144p through 1080p, with 60 FPS options at 720p and 1080p.
 - Pinch-to-zoom, panning, zoom buttons, and reset.
+
+> **Live audio availability:** this feature is on the live-audio development branch. Build both the Mac agent and Android app from that same branch. Previously published v1.5.0 Stable and v1.6.0 Beta 1 APKs do not contain this audio feature yet. Follow [the audio build and test guide](docs/LIVE_SCREEN_AUDIO.md).
 
 Actual frame rate and image quality depend on the Mac, display size, temperature, and network conditions.
 
@@ -220,6 +224,10 @@ Use the Home and Control areas for status and remote actions. Lock, sleep, resta
 
 Open Live Screen from the app and choose VIEW or CONTROL mode. Start at 720p/30 FPS if the connection is unstable. Increase quality only if the network and Mac can keep up. Grant Screen Recording permission on the Mac, and Accessibility permission when using CONTROL mode.
 
+### Listen to Mac system audio
+
+On a build containing live-audio support, tap **♫ OFF** in the Live Screen controls to enable system-output audio. Tap it again to stop capture. Long-press the button to open Android's local playback volume and mute controls. Audio capture is requested only while a connected viewer explicitly enables it; turning it off returns the stream to video-only operation. Both the Mac agent and Android app must come from the same live-audio-enabled source revision.
+
 ### Use Device Studio
 
 - **Profiles:** add, switch, or remove saved Macs.
@@ -242,6 +250,12 @@ The v1.6.0 Device Studio operations require a matching v1.6.0 Mac agent and Andr
 - Grant Screen Recording access in macOS Privacy & Security.
 - Restart the Mac agent after changing the permission.
 - Try 720p/30 FPS before increasing quality.
+
+**Live Screen audio is silent**
+- Confirm you built and installed the matching live-audio-enabled Mac agent and Android app; the published v1.6.0 Beta 1 APK predates this feature.
+- Check that **♫ ON** is displayed, the Android local mute is off, and the playback volume is raised.
+- Play audio locally on the Mac and verify that the system output is not muted.
+- Disconnect/reconnect the live session after enabling or disabling audio.
 
 **Clipboard, file transfer, or audio options fail**
 - Confirm that both the Android app and Mac agent are from v1.6.0 source.
@@ -276,6 +290,7 @@ The CI workflows validate compilation and source structure. They do not replace 
 - `mac/` — native macOS agent (Swift)
 - `docs/BUILD_NOTES.md` — build, installation, signing, and verification guide
 - `docs/RELEASE_NOTES_v1.6.0.md` — v1.6.0 beta changes
+- `docs/LIVE_SCREEN_AUDIO.md` — live system-audio protocol and manual test plan
 - `.github/workflows/` — CI and release workflows
 
 ## License
