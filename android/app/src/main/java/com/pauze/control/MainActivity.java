@@ -34,9 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
 
     private static final int MUTED = Color.rgb(133, 117, 106);
-    private static final int WHITE = Color.rgb(40, 33, 30);
-    private static final int GREEN = Color.rgb(70, 220, 150);
-    private static final int AMBER = Color.rgb(255, 193, 7);
+    private static final int WHITE = Color.rgb(248, 240, 232);
+    private static final int GREEN = Color.rgb(38, 107, 75);
+    private static final int AMBER = Color.rgb(149, 87, 64);
 
     private EditText hostInput;
     private EditText tokenInput;
@@ -1191,7 +1191,7 @@ public final class MainActivity extends Activity {
             TextView titleView = new TextView(this);
             titleView.setText(title);
             titleView.setTextColor(Color.parseColor(
-                    successful ? "#72E6B2" : "#FF9292"
+                    successful ? "#955740" : "#8F3C2F"
             ));
             titleView.setTextSize(12);
             titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -1210,7 +1210,7 @@ public final class MainActivity extends Activity {
                     "HH:mm:ss",
                     Locale.getDefault()
             ).format(new Date()));
-            timeView.setTextColor(Color.parseColor("#7F8DA4"));
+            timeView.setTextColor(Color.parseColor("#85756A"));
             timeView.setTextSize(10);
             heading.addView(timeView);
 
@@ -1218,7 +1218,7 @@ public final class MainActivity extends Activity {
             detailView.setText(detail == null || detail.trim().isEmpty()
                     ? "No additional details"
                     : detail);
-            detailView.setTextColor(Color.parseColor("#B5C0D1"));
+            detailView.setTextColor(Color.parseColor("#51433B"));
             detailView.setTextSize(11);
             detailView.setPadding(0, dp(5), 0, 0);
 
