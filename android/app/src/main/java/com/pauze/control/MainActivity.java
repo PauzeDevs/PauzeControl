@@ -611,15 +611,14 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        getSharedPreferences("pauze_connection", MODE_PRIVATE)
-                .edit()
-                .putString("host", host)
-                .apply();
-
         executor.execute(
                 () -> {
                     try {
                         secureStore.putToken(token);
+                        getSharedPreferences("pauze_connection", MODE_PRIVATE)
+                                .edit()
+                                .putString("host", host)
+                                .apply();
                         setStatus(
                                 "Connection saved • syncing Mac…"
                         );
@@ -1048,9 +1047,12 @@ public final class MainActivity extends Activity {
 
                         if (result.code < 200 ||
                                 result.code >= 300) {
-                            throw new IllegalStateException(
-                                    "Volume command failed."
-                            );
+                            String message = "Volume command failed (HTTP " + result.code + ").";
+                            try {
+                                message = new JSONObject(result.body).optString("error", message);
+                            } catch (Exception ignored) {
+                            }
+                            throw new IllegalStateException(message);
                         }
 
                         setStatus(
