@@ -74,6 +74,7 @@ public final class ScreenActivity extends Activity
     private Thread audioPlaybackThread;
     private volatile boolean audioPlaybackRunning;
     private volatile boolean audioEnabled;
+    private volatile boolean audioPlaybackUnavailable;
     private volatile boolean audioMuted;
     private volatile float audioVolume = 0.85f;
     private Button audioButton;
@@ -415,8 +416,8 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void onAudio(byte[] pcmS16LittleEndian, long ptsMicroseconds) {
-        if (!audioEnabled || shuttingDown || pcmS16LittleEndian == null ||
-                pcmS16LittleEndian.length == 0) {
+        if (!audioEnabled || audioPlaybackUnavailable || shuttingDown ||
+                pcmS16LittleEndian == null || pcmS16LittleEndian.length == 0) {
             return;
         }
 
@@ -428,6 +429,7 @@ public final class ScreenActivity extends Activity
                     "Live audio unavailable: " + error.getMessage(),
                     Toast.LENGTH_LONG
             ).show());
+            audioPlaybackUnavailable = true;
             stopAudioPlayback();
             return;
         }
@@ -1104,6 +1106,7 @@ public final class ScreenActivity extends Activity
 
     private void toggleAudio() {
         audioEnabled = !audioEnabled;
+        audioPlaybackUnavailable = false;
         getPreferences(MODE_PRIVATE).edit()
                 .putBoolean("screen_audio_enabled", audioEnabled)
                 .apply();
