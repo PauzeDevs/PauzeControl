@@ -14,6 +14,11 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 
 ### Android control center
 - Four persistent navigation tabs: Home, Control, Activity, and Settings.
+- Device Studio with saved Mac profiles; each profile pairing secret is encrypted using Android Keystore-backed AES-GCM.
+- Personalisation Studio with Warm Paper, Midnight and Ocean themes, selectable accent colours and compact spacing.
+- Explicit, user-triggered clipboard transfer in either direction; no background clipboard collection.
+- Authenticated chunked file transfer to a dedicated macOS application-support folder with a 50 MiB per-file limit.
+- Native macOS system-default output and input device selection.
 - Connection card and live macOS system dashboard.
 - Remote restriction/allow commands, lock, sleep, restart, shutdown, mute/unmute, and volume control.
 - Connection status and automatic refresh while the app is foregrounded.

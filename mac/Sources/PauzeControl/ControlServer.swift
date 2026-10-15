@@ -418,6 +418,103 @@ final class ControlServer {
                 )
             }
 
+        case ("GET", "/v1/clipboard"):
+            do {
+                return HTTPResponse.json(status: 200,
+                    body: ClipboardResponse(ok: true, text: try ClipboardService.readText()))
+            } catch {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: error.localizedDescription))
+            }
+
+        case ("POST", "/v1/clipboard"):
+            guard let bodyData = request.body.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                  let text = object["text"] as? String else {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: "Clipboard text is required."))
+            }
+            do {
+                try ClipboardService.writeText(text)
+                return HTTPResponse.json(status: 200, body: ClipboardResponse(ok: true, text: ""))
+            } catch {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: error.localizedDescription))
+            }
+
+        case ("GET", "/v1/files/list"):
+            do {
+                return HTTPResponse.json(status: 200,
+                    body: FilesListResponse(ok: true, files: try FileTransferStore.list()))
+            } catch {
+                return HTTPResponse.json(status: 500,
+                    body: ErrorResponse(ok: false, error: "Could not list transferred files."))
+            }
+
+        case ("POST", "/v1/files/upload-chunk"):
+            guard let bodyData = request.body.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                  let transferID = object["transfer_id"] as? String,
+                  let filename = object["filename"] as? String,
+                  let offset = object["offset"] as? Int,
+                  let total = object["total"] as? Int,
+                  let base64 = object["data"] as? String else {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: "Invalid upload chunk request."))
+            }
+            do {
+                let complete = try FileTransferStore.appendChunk(transferID: transferID,
+                    filename: filename, offset: Int64(offset), total: Int64(total), base64Data: base64)
+                return HTTPResponse.json(status: 200, body: UploadChunkResponse(ok: true, complete: complete))
+            } catch {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: error.localizedDescription))
+            }
+
+        case ("POST", "/v1/files/download-chunk"):
+            guard let bodyData = request.body.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                  let filename = object["filename"] as? String,
+                  let offset = object["offset"] as? Int else {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: "Invalid download chunk request."))
+            }
+            do {
+                let chunk = try FileTransferStore.readChunk(filename: filename, offset: Int64(offset))
+                return HTTPResponse.json(status: 200,
+                    body: DownloadChunkResponse(ok: true, filename: filename, offset: offset,
+                        total: chunk.total, data: chunk.base64Data))
+            } catch {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: error.localizedDescription))
+            }
+
+        case ("GET", "/v1/audio/devices"):
+            do {
+                return HTTPResponse.json(status: 200,
+                    body: AudioDevicesResponse(ok: true, devices: try AudioDeviceService.list()))
+            } catch {
+                return HTTPResponse.json(status: 500,
+                    body: ErrorResponse(ok: false, error: "Could not enumerate macOS audio devices."))
+            }
+
+        case ("POST", "/v1/audio/device"):
+            guard let bodyData = request.body.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                  let idNumber = object["id"] as? NSNumber,
+                  let direction = object["direction"] as? String else {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: "An audio device ID and direction are required."))
+            }
+            do {
+                try AudioDeviceService.setDefaultDevice(id: idNumber.uint32Value, direction: direction)
+                return HTTPResponse.json(status: 200,
+                    body: AudioDeviceChangeResponse(ok: true, direction: direction, deviceID: idNumber.uint32Value))
+            } catch {
+                return HTTPResponse.json(status: 400,
+                    body: ErrorResponse(ok: false, error: error.localizedDescription))
+            }
+
         case ("GET", "/v1/status"):
             return HTTPResponse.json(
                 status: 200,

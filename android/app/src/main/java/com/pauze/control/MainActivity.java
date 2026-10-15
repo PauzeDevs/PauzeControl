@@ -121,6 +121,7 @@ public final class MainActivity extends Activity {
         setupRevealAnimations();
         setupNavigation();
         setupActions();
+        Personalization.apply(this);
         loadSavedConnection();
     }
 
@@ -176,6 +177,12 @@ public final class MainActivity extends Activity {
                 R.id.statusButton,
                 "REFRESH STATUS",
                 () -> refreshStatus(true)
+        );
+
+        setupToggleAction(
+                R.id.featureStudioButton,
+                "DEVICE STUDIO",
+                () -> startActivity(new Intent(this, FeatureStudioActivity.class))
         );
 
         restrictionControl.setText(
@@ -535,7 +542,7 @@ public final class MainActivity extends Activity {
 
     private void loadSavedConnection() {
         String host =
-                getPreferences(MODE_PRIVATE)
+                getSharedPreferences("pauze_connection", MODE_PRIVATE)
                         .getString(
                                 "host",
                                 ""
@@ -589,7 +596,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        getPreferences(MODE_PRIVATE)
+        getSharedPreferences("pauze_connection", MODE_PRIVATE)
                 .edit()
                 .putString("host", host)
                 .apply();
@@ -1321,6 +1328,8 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         activityResumed = true;
+        Personalization.apply(this);
+        syncConnectionFromSavedStore();
 
         mainHandler.removeCallbacks(
                 statusPoll
@@ -1330,6 +1339,28 @@ public final class MainActivity extends Activity {
                 statusPoll,
                 1200L
         );
+    }
+
+    private void syncConnectionFromSavedStore() {
+        if (hostInput == null || tokenInput == null || secureStore == null || executor == null) {
+            return;
+        }
+        String savedHost = getSharedPreferences("pauze_connection", MODE_PRIVATE)
+                .getString("host", "");
+        if (!hostInput.hasFocus() && !savedHost.equals(hostInput.getText().toString().trim())) {
+            hostInput.setText(savedHost);
+        }
+        executor.execute(() -> {
+            try {
+                String savedToken = secureStore.getToken();
+                mainHandler.post(() -> {
+                    if (!isFinishing() && tokenInput != null && !tokenInput.hasFocus()) {
+                        tokenInput.setText(savedToken);
+                    }
+                });
+            } catch (Exception ignored) {
+            }
+        });
     }
 
     @Override
