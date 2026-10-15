@@ -5,6 +5,9 @@ package com.pauze.control;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.pm.ActivityInfo;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.os.Bundle;
@@ -22,6 +25,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import org.json.JSONObject;
@@ -29,6 +33,8 @@ import org.json.JSONObject;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public final class ScreenActivity extends Activity
         implements ScreenStreamClient.Listener,
@@ -58,6 +64,19 @@ public final class ScreenActivity extends Activity
     private ScreenStreamClient streamClient;
     private MediaCodec decoder;
     private Surface decoderSurface;
+
+    private static final int SYSTEM_AUDIO_SAMPLE_RATE = 24_000;
+    private static final int AUDIO_QUEUE_CAPACITY = 12;
+    private final ArrayBlockingQueue<byte[]> audioBuffers =
+            new ArrayBlockingQueue<>(AUDIO_QUEUE_CAPACITY);
+    private final Object audioLock = new Object();
+    private AudioTrack audioTrack;
+    private Thread audioPlaybackThread;
+    private volatile boolean audioPlaybackRunning;
+    private volatile boolean audioEnabled;
+    private volatile boolean audioMuted;
+    private volatile float audioVolume = 0.85f;
+    private Button audioButton;
 
     private String host;
     private String token;
@@ -205,6 +224,19 @@ public final class ScreenActivity extends Activity
         Button controlModeButton = findViewById(R.id.controlModeButton);
         Button typeTextButton = findViewById(R.id.typeTextButton);
         typeTextButton.setEnabled(false);
+        audioButton = findViewById(R.id.audioButton);
+        audioEnabled = getPreferences(MODE_PRIVATE)
+                .getBoolean("screen_audio_enabled", false);
+        audioVolume = Math.max(0f, Math.min(1f, getPreferences(MODE_PRIVATE)
+                .getFloat("screen_audio_volume", 0.85f)));
+        audioMuted = getPreferences(MODE_PRIVATE)
+                .getBoolean("screen_audio_muted", false);
+        updateAudioButton();
+        audioButton.setOnClickListener(view -> toggleAudio());
+        audioButton.setOnLongClickListener(view -> {
+            showAudioVolumeDialog();
+            return true;
+        });
         qualityButton.setText(selectedQuality.toUpperCase(Locale.US));
         controlModeButton.setOnClickListener(view -> {
             controlMode = !controlMode;
@@ -324,6 +356,7 @@ public final class ScreenActivity extends Activity
         if (activeClient != null) {
             activeClient.stop();
         }
+        stopAudioPlayback();
     }
 
     private void startStream() {
@@ -345,7 +378,7 @@ public final class ScreenActivity extends Activity
         aspectApplied = false;
 
         centerControls.setVisibility(View.GONE);
-        streamClient = new ScreenStreamClient(host, token, this);
+        streamClient = new ScreenStreamClient(host, token, this, audioEnabled);
         streamClient.start();
     }
 
@@ -354,6 +387,7 @@ public final class ScreenActivity extends Activity
             return;
         }
 
+        stopAudioPlayback();
         reconnectAttempts = 0;
         manualReconnectRequested = true;
         screenSurface.removeCallbacks(automaticReconnectRunnable);
@@ -377,6 +411,33 @@ public final class ScreenActivity extends Activity
         }
 
         showControlsTemporarily();
+    }
+
+    @Override
+    public void onAudio(byte[] pcmS16LittleEndian, long ptsMicroseconds) {
+        if (!audioEnabled || shuttingDown || pcmS16LittleEndian == null ||
+                pcmS16LittleEndian.length == 0) {
+            return;
+        }
+
+        try {
+            ensureAudioPlayback();
+        } catch (Exception error) {
+            runOnUiThread(() -> Toast.makeText(
+                    this,
+                    "Live audio unavailable: " + error.getMessage(),
+                    Toast.LENGTH_LONG
+            ).show());
+            stopAudioPlayback();
+            return;
+        }
+
+        // Bound queued latency. When the phone or network stalls, drop the
+        // oldest audio chunk rather than building up seconds of delayed sound.
+        if (!audioBuffers.offer(pcmS16LittleEndian)) {
+            audioBuffers.poll();
+            audioBuffers.offer(pcmS16LittleEndian);
+        }
     }
 
     @Override
@@ -631,6 +692,7 @@ public final class ScreenActivity extends Activity
 
     @Override
     public void onClosed() {
+        stopAudioPlayback();
         releaseDecoder();
 
         runOnUiThread(() -> {
@@ -1040,6 +1102,182 @@ public final class ScreenActivity extends Activity
         }
     }
 
+    private void toggleAudio() {
+        audioEnabled = !audioEnabled;
+        getPreferences(MODE_PRIVATE).edit()
+                .putBoolean("screen_audio_enabled", audioEnabled)
+                .apply();
+
+        if (!audioEnabled) {
+            stopAudioPlayback();
+        }
+        updateAudioButton();
+        showControlsTemporarily();
+        Toast.makeText(
+                this,
+                audioEnabled ? "Mac system audio enabled" : "Mac system audio disabled",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        if (streamClient != null) {
+            reconnect();
+        } else if (surfaceReady) {
+            startStream();
+        }
+    }
+
+    private void updateAudioButton() {
+        if (audioButton == null) return;
+        audioButton.setText(audioEnabled ? "♫ ON" : "♫ OFF");
+        audioButton.setContentDescription(
+                audioEnabled
+                        ? "System audio streaming enabled. Tap to disable; hold for volume."
+                        : "System audio streaming disabled. Tap to enable; hold for volume."
+        );
+    }
+
+    private void ensureAudioPlayback() {
+        synchronized (audioLock) {
+            if (audioTrack != null && audioPlaybackRunning) return;
+
+            int minimumBuffer = AudioTrack.getMinBufferSize(
+                    SYSTEM_AUDIO_SAMPLE_RATE,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+            );
+            if (minimumBuffer <= 0) {
+                throw new IllegalStateException("This device does not support 24 kHz mono PCM.");
+            }
+
+            AudioTrack candidate = new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build())
+                    .setAudioFormat(new AudioFormat.Builder()
+                            .setSampleRate(SYSTEM_AUDIO_SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .build())
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .setBufferSizeInBytes(Math.max(minimumBuffer, SYSTEM_AUDIO_SAMPLE_RATE * 2 / 5))
+                    .build();
+
+            if (candidate.getState() != AudioTrack.STATE_INITIALIZED) {
+                candidate.release();
+                throw new IllegalStateException("Android could not initialize audio playback.");
+            }
+
+            candidate.setVolume(audioMuted ? 0f : audioVolume);
+            candidate.play();
+            audioTrack = candidate;
+            audioPlaybackRunning = true;
+
+            audioPlaybackThread = new Thread(
+                    this::audioPlaybackLoop,
+                    "PauzeControl-LiveAudio"
+            );
+            audioPlaybackThread.start();
+        }
+    }
+
+    private void audioPlaybackLoop() {
+        while (audioPlaybackRunning && !Thread.currentThread().isInterrupted()) {
+            final byte[] chunk;
+            try {
+                chunk = audioBuffers.poll(250, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            if (chunk == null) continue;
+
+            int offset = 0;
+            while (offset < chunk.length && audioPlaybackRunning) {
+                AudioTrack activeTrack;
+                synchronized (audioLock) {
+                    activeTrack = audioTrack;
+                }
+                if (activeTrack == null) break;
+
+                int written = activeTrack.write(
+                        chunk,
+                        offset,
+                        chunk.length - offset,
+                        AudioTrack.WRITE_BLOCKING
+                );
+                if (written < 0) break;
+                if (written == 0) break;
+                offset += written;
+            }
+        }
+    }
+
+    private void stopAudioPlayback() {
+        audioPlaybackRunning = false;
+        audioBuffers.clear();
+
+        Thread worker;
+        synchronized (audioLock) {
+            worker = audioPlaybackThread;
+            audioPlaybackThread = null;
+            AudioTrack activeTrack = audioTrack;
+            audioTrack = null;
+
+            if (activeTrack != null) {
+                try { activeTrack.pause(); } catch (Exception ignored) { }
+                try { activeTrack.flush(); } catch (Exception ignored) { }
+                try { activeTrack.stop(); } catch (Exception ignored) { }
+                activeTrack.release();
+            }
+        }
+        if (worker != null) worker.interrupt();
+    }
+
+    private void applyAudioVolume() {
+        synchronized (audioLock) {
+            if (audioTrack != null) {
+                audioTrack.setVolume(audioMuted ? 0f : audioVolume);
+            }
+        }
+    }
+
+    private void showAudioVolumeDialog() {
+        SeekBar volume = new SeekBar(this);
+        volume.setMax(100);
+        volume.setProgress(Math.round(audioVolume * 100f));
+        volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                audioVolume = progress / 100f;
+                applyAudioVolume();
+                getPreferences(MODE_PRIVATE).edit()
+                        .putFloat("screen_audio_volume", audioVolume)
+                        .apply();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) { }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) { }
+        });
+
+        new AlertDialog.Builder(this)
+                .setTitle("Live audio volume")
+                .setMessage("Adjust playback on this Android device. Hold the audio button to reopen this control.")
+                .setView(volume)
+                .setNeutralButton(audioMuted ? "Unmute" : "Mute", (dialog, which) -> {
+                    audioMuted = !audioMuted;
+                    getPreferences(MODE_PRIVATE).edit()
+                            .putBoolean("screen_audio_muted", audioMuted)
+                            .apply();
+                    applyAudioVolume();
+                })
+                .setPositiveButton("Done", null)
+                .show();
+    }
+
     private synchronized void releaseDecoder() {
         MediaCodec activeDecoder = decoder;
         decoder = null;
@@ -1153,6 +1391,7 @@ public final class ScreenActivity extends Activity
             releaseDecoder();
         }
 
+        stopAudioPlayback();
         super.onDestroy();
     }
 }
