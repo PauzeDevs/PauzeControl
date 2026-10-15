@@ -3,7 +3,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050609"
+    android:background="#F2E5D8"
     android:keepScreenOn="true">
 
     <SurfaceView
@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#B807080B"
+        android:background="#E6F8F0E8"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="18dp"
@@ -32,7 +32,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="PAUZE"
-            android:textColor="#FFFFFF"
+            android:textColor="#28211E"
             android:textSize="18sp"
             android:textStyle="bold"
             android:letterSpacing="0.08" />
@@ -44,7 +44,7 @@
             android:layout_weight="1"
             android:layout_marginStart="14dp"
             android:text="CONNECTING • H.264"
-            android:textColor="#69F0AE"
+            android:textColor="#955740"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -54,7 +54,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:text="VIEW ONLY • H.264"
-            android:textColor="#E0E3EA"
+            android:textColor="#51433B"
             android:textSize="10sp"
             android:textStyle="bold" />
 
@@ -102,13 +102,79 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Pinch-to-zoom and explicit controls for accurate remote clicking. -->
+    <LinearLayout
+        android:id="@+id/zoomControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/card_status"
+        android:elevation="8dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="5dp">
+
+        <Button
+            android:id="@+id/zoomInButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/button_primary"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="+"
+            android:textColor="#FFF8F1"
+            android:textSize="23sp"
+            android:contentDescription="Zoom in on Mac screen" />
+
+        <TextView
+            android:id="@+id/zoomLevelText"
+            android:layout_width="44dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:text="1.0×"
+            android:textColor="#28211E"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:contentDescription="Current screen zoom level" />
+
+        <Button
+            android:id="@+id/zoomOutButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/card_metric"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="−"
+            android:textColor="#28211E"
+            android:textSize="23sp"
+            android:contentDescription="Zoom out on Mac screen" />
+
+        <Button
+            android:id="@+id/zoomResetButton"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="3dp"
+            android:background="@android:color/transparent"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="RESET"
+            android:textColor="#955740"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:contentDescription="Reset Mac screen zoom" />
+    </LinearLayout>
+
     <!-- Bottom player controls: no fake seek bar because this is a live stream. -->
     <LinearLayout
         android:id="@+id/bottomControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#CC07080B"
+        android:background="#E6E5CDB8"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"
