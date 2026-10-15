@@ -29,4 +29,4 @@ jobs:
         with:
           name: PauzeControl-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          retention-days: 90
