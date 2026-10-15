@@ -226,7 +226,7 @@ Open Live Screen from the app and choose VIEW or CONTROL mode. Start at 720p/30 
 
 ### Listen to Mac system audio
 
-On a build containing live-audio support, tap **♫ OFF** in the Live Screen controls to enable system-output audio. Tap it again to stop capture. Long-press the button to open Android's local playback volume and mute controls. Audio capture is requested only while a connected viewer explicitly enables it; turning it off returns the stream to video-only operation. Both the Mac agent and Android app must come from the same live-audio-enabled source revision.
+On a build containing live-audio support, tap **♫ OFF** in the Live Screen controls to enable system-output audio. Tap it again to stop capture. Long-press the button to open Android's local playback volume and mute controls. Audio capture is requested only after the viewer explicitly enables it for that session; it starts off again the next time Live Screen opens. Turning it off returns the stream to video-only operation. Both the Mac agent and Android app must come from the same live-audio-enabled source revision.
 
 ### Use Device Studio
 
