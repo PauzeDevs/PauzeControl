@@ -226,8 +226,9 @@ public final class ScreenActivity extends Activity
         Button typeTextButton = findViewById(R.id.typeTextButton);
         typeTextButton.setEnabled(false);
         audioButton = findViewById(R.id.audioButton);
-        audioEnabled = getPreferences(MODE_PRIVATE)
-                .getBoolean("screen_audio_enabled", false);
+        // System audio is opt-in for each Live Screen session. Never resume
+        // capture automatically from a previous session.
+        audioEnabled = false;
         audioVolume = Math.max(0f, Math.min(1f, getPreferences(MODE_PRIVATE)
                 .getFloat("screen_audio_volume", 0.85f)));
         audioMuted = getPreferences(MODE_PRIVATE)
@@ -1107,10 +1108,6 @@ public final class ScreenActivity extends Activity
     private void toggleAudio() {
         audioEnabled = !audioEnabled;
         audioPlaybackUnavailable = false;
-        getPreferences(MODE_PRIVATE).edit()
-                .putBoolean("screen_audio_enabled", audioEnabled)
-                .apply();
-
         if (!audioEnabled) {
             stopAudioPlayback();
         }
