@@ -719,13 +719,27 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     fileprivate func handleEncoded(_ sampleBuffer: CMSampleBuffer) {
-        guard CMSampleBufferIsValid(sampleBuffer), let format = CMSampleBufferGetFormatDescription(sampleBuffer), let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
+        guard CMSampleBufferIsValid(sampleBuffer),
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)
+        else { return }
         let headerLength = h264NALHeaderLength(formatDescription: format)
-        var totalLength = 0
-        var lengthAtOffset = 0
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        guard CMBlockBufferGetDataPointer(dataBuffer, atOffset: 0, lengthAtOffsetOut: &lengthAtOffset, totalLengthOut: &totalLength, dataPointerOut: &dataPointer) == kCMBlockBufferNoErr, totalLength > 0, let dataPointer else { return }
-        let bytes = UnsafeMutableRawPointer(dataPointer).assumingMemoryBound(to: UInt8.self)
+        let totalLength = CMBlockBufferGetDataLength(dataBuffer)
+        // Android rejects access units above this limit; enforce the same cap
+        // here and copy segmented CoreMedia blocks before indexing their bytes.
+        guard totalLength > 0, totalLength <= 5 * 1024 * 1024 else { return }
+        var encodedData = Data(count: totalLength)
+        let copyStatus = encodedData.withUnsafeMutableBytes { destination -> OSStatus in
+            guard let base = destination.baseAddress else { return -1 }
+            return CMBlockBufferCopyDataBytes(
+                dataBuffer,
+                atOffset: 0,
+                dataLength: totalLength,
+                destination: base.assumingMemoryBound(to: Int8.self)
+            )
+        }
+        guard copyStatus == kCMBlockBufferNoErr else { return }
+        let bytes = [UInt8](encodedData)
         var accessUnit = Data()
         var offset = 0
         var containsIDR = false
@@ -736,7 +750,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             guard nalLength > 0, offset + nalLength <= totalLength else { return }
             if Int(bytes[offset] & 0x1F) == 5 { containsIDR = true }
             appendStartCode(to: &accessUnit)
-            accessUnit.append(Data(bytes: bytes.advanced(by: offset), count: nalLength))
+            accessUnit.append(contentsOf: bytes[offset..<(offset + nalLength)])
             offset += nalLength
         }
         guard !accessUnit.isEmpty else { return }
