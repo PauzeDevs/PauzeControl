@@ -113,11 +113,6 @@ public final class SecureStore {
         prefs.edit().remove("secret_" + key).apply();
     }
 
-    public void removeSecret(String key) {
-        if (key == null || !key.matches("[A-Za-z0-9_-]{1,128}")) return;
-        prefs.edit().remove("secret_" + key).apply();
-    }
-
     private SecretKey getOrCreateKey() throws Exception {
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
