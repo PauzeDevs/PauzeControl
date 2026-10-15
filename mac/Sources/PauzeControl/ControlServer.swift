@@ -548,10 +548,17 @@ final class ControlServer {
             )
 
         case ("POST", "/v1/restrict"):
-            return HTTPResponse.json(
-                status: 200,
-                body: manager.restrict()
-            )
+            let restriction = manager.restrict()
+            guard restriction.inputBlockingEnabled else {
+                return HTTPResponse.json(
+                    status: 503,
+                    body: ErrorResponse(
+                        ok: false,
+                        error: "macOS did not allow input blocking. Enable Input Monitoring/Accessibility permissions for PauzeControl and retry."
+                    )
+                )
+            }
+            return HTTPResponse.json(status: 200, body: restriction)
 
         case ("POST", "/v1/allow"):
             return HTTPResponse.json(
