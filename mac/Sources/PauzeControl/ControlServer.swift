@@ -513,7 +513,7 @@ final class ControlServer {
                     body: AudioDevicesResponse(ok: true, devices: try AudioDeviceService.list()))
             } catch {
                 return HTTPResponse.json(status: 500,
-                    body: ErrorResponse(ok: false, error: "Could not enumerate macOS audio devices."))
+                    body: ErrorResponse(ok: false, error: "Could not enumerate macOS audio devices: \(error.localizedDescription)"))
             }
 
         case ("POST", "/v1/audio/device"):
