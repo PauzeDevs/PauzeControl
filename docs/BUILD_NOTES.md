@@ -1,27 +1,24 @@
-# PauzeControl — Build and Release Notes
+# PauzeControl — Build, Install, and Release Notes
 
-These instructions build the Android controller and macOS agent from source. They also cover producing and verifying Android APKs.
+This guide covers local builds, signing, installation checks, and release verification for the Android controller and the native macOS agent.
 
-## Release identity
+## Current source and downloads
 
-> **Current downloads:** [v1.4.0 Debug APK](https://github.com/PauzeDevs/PauzeControl/releases/download/v1.4.0-beta.1/PauzeControl-v1.4.0-debug.apk) · [v1.4.0 Stable GitHub release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0) · [v1.4.0 Beta release](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.4.0-beta.1). Both channel APKs are debug-signed GitHub distributions, not production-signed Play Store packages.
+- **Source version on `main`:** v1.6.0 / Android version code 6.
+- **Latest published stable APK:** [PauzeControl v1.5.0](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0).
+- **v1.6.0:** beta release packaging is configured for tag `v1.6.0-beta.1`. Until that tag's release workflow completes, the v1.5.0 download is still the latest published stable APK.
+- **Package:** `com.pauze.control`.
+- **Android minimum:** API 26 (Android 8.0); compile/target SDK 35.
+- **Android toolchain:** JDK 17 and Gradle 8.9.
+- **Mac minimum:** macOS 14 or later.
 
-- Android application ID: com.pauze.control
-- Release version name: 1.4.0
-- Release version code: 4
-- Android minimum API: 26 (Android 8.0)
-- Android target/compile API: 35
-- Java toolchain: 17
-- Gradle: 8.9
-- macOS deployment minimum: macOS 14
-
-A successful debug build is not a signed release build. For distribution, use the release signing steps below and preserve the same signing keystore for all future updates.
+A successful debug build is not a production-signed release build. Both the current published stable channel and the planned beta direct-download package are/debug builds; neither is a Google Play release.
 
 ## Android debug build
 
 ### Prerequisites
 
-Install JDK 17, Android SDK Platform 35, and an Android SDK Build Tools version containing apksigner. Install Gradle 8.9 and configure ANDROID_HOME (or ANDROID_SDK_ROOT) to the Android SDK directory.
+Install JDK 17, Android SDK Platform 35, Android Build Tools, and Gradle 8.9. Configure `ANDROID_HOME` or `ANDROID_SDK_ROOT` to point to the SDK directory.
 
 Verify the tools:
 
@@ -31,7 +28,7 @@ gradle --version
 adb version
 ```
 
-Gradle 8.9 should be reported. This repository does not currently commit a Gradle wrapper, so use an installed Gradle 8.9 or add a wrapper as a separately reviewed change.
+This repository does not currently commit a Gradle wrapper, so use an installed Gradle 8.9 or add a wrapper as a separately reviewed change.
 
 ### Build
 
@@ -44,197 +41,169 @@ gradle clean assembleDebug --no-daemon
 
 Output:
 
-`android/app/build/outputs/apk/debug/app-debug.apk`
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
 
-To install on a connected device with USB debugging enabled:
+Install to a connected device with USB debugging enabled:
 
 ```sh
 adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The current stable GitHub channel is also debug-signed; it is not a production-signed distribution. A separately configured release keystore is required before publishing a production-signed APK.
+If Android rejects an update with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the new APK was signed with a different key than the installed app. Back up anything important before uninstalling the old app; uninstalling clears application data.
 
-## Android signed release build
+## Android production signing
 
-### 1. Create the long-lived release keystore
+The configured Gradle release variant reads these environment variables:
 
-Create a private directory and keep the keystore out of the repository:
+- `ANDROID_KEYSTORE_PATH` — absolute path to the keystore
+- `ANDROID_KEYSTORE_PASSWORD` — keystore password
+- `ANDROID_KEY_ALIAS` — key alias
+- `ANDROID_KEY_PASSWORD` — private-key password
 
-```sh
-mkdir -p "$HOME/.keys"
-chmod 700 "$HOME/.keys"
-keytool -genkeypair -v \
-  -keystore "$HOME/.keys/pauze-release.jks" \
-  -alias pauzecontrol \
-  -keyalg RSA -keysize 4096 -validity 10000
-chmod 600 "$HOME/.keys/pauze-release.jks"
-```
+Create a long-lived keystore outside the repository and back it up securely. Never commit the keystore or passwords. Losing the signing key prevents compatible updates for apps signed with it.
 
-Record the keystore password, key alias, and key password in a secure password manager. Back up the keystore securely. **Losing this keystore prevents you from signing compatible updates for users of this release.** Never commit the keystore or passwords to Git.
+For an existing installation, a new release must use the same signing key as that installation. A different key cannot update it in place.
 
-For an existing installation, use the same signing key that signed that installed APK; a new key will not be accepted as an in-place update.
-
-### 2. Configure local signing variables
-
-Set these environment variables in the terminal used for Gradle:
-
-- ANDROID_KEYSTORE_PATH — absolute path to the JKS file
-- ANDROID_KEYSTORE_PASSWORD — keystore password
-- ANDROID_KEY_ALIAS — the alias, for example pauzecontrol
-- ANDROID_KEY_PASSWORD — private key password
-
-Example (replace password placeholders locally; do not commit them):
+Example local environment setup (replace the example values locally; do not commit them):
 
 ```sh
 export ANDROID_KEYSTORE_PATH="$HOME/.keys/pauze-release.jks"
 export ANDROID_KEYSTORE_PASSWORD='your-keystore-password'
 export ANDROID_KEY_ALIAS='pauzecontrol'
 export ANDROID_KEY_PASSWORD='your-key-password'
-```
-
-### 3. Build the signed APK
-
-From the repository root:
-
-```sh
 cd android
 gradle clean assembleRelease --no-daemon
 ```
 
-When the signing variables are present, Gradle signs the release variant. Expected output:
+Expected output:
 
-`android/app/build/outputs/apk/release/app-release.apk`
-
-If signing is not configured, Gradle can produce an unsigned release APK. Do not distribute that file as the stable release.
-
-### 4. Verify the signature and calculate the checksum
-
-From the repository root, identify the most recent Android Build Tools version and verify the APK:
-
-```sh
-APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-test -x "$APKSIGNER"
-"$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
-sha256sum android/app/build/outputs/apk/release/app-release.apk
+```text
+android/app/build/outputs/apk/release/app-release.apk
 ```
 
-Keep the SHA-256 checksum with the release notes. Before publishing, confirm the output path exists and signature verification exits successfully. Test installation and upgrade behavior on a physical Android device. An APK signature check does not replace device testing.
+If the signing variables are missing, Gradle may create an unsigned release APK. Do not distribute an unsigned build as a release.
 
-## Configure GitHub Actions release signing
-
-The release workflow expects four **repository Actions secrets**. Configure them in GitHub: **Settings → Secrets and variables → Actions → Repository secrets**.
-
-| Secret name | Value |
-|---|---|
-| ANDROID_KEYSTORE_BASE64 | Base64 encoding of the release keystore file |
-| ANDROID_KEYSTORE_PASSWORD | Keystore password |
-| ANDROID_KEY_ALIAS | Signing key alias |
-| ANDROID_KEY_PASSWORD | Private key password |
-
-On macOS, make the base64 value without line breaks:
-
-```sh
-base64 < "$HOME/.keys/pauze-release.jks" | tr -d '\n'
-```
-
-Copy that output directly into the ANDROID_KEYSTORE_BASE64 secret. Do not add the keystore itself to the repository or paste passwords into workflow YAML.
-
-The current v1.4.0 channel workflow builds and verifies a debug APK, then publishes separate beta/debug and stable GitHub channel releases from the same build. Both APKs are debug-signed. It does not decode the production release keystore or create a production-signed APK.
-
-If one of the secrets is missing or invalid, the workflow intentionally fails instead of quietly shipping an unsigned artifact. The repository maintainer must create/configure the release secrets; repository code cannot safely create or retrieve them.
-
-## macOS agent build
-
-### Prerequisites
-
-- macOS 14 or later
-- Xcode Command Line Tools and the Swift toolchain
-- Screen Recording permission for the live stream
-- Accessibility permission is required for interactive Live Screen input; Input Monitoring may be required for restriction/input blocking
-- A connected Tailscale network for Android-to-Mac communication
-
-Verify Swift is available:
-
-```sh
-swift --version
-xcode-select -p
-```
-
-### Compile and install
+### Verify an APK
 
 From the repository root:
 
 ```sh
-cd mac
+APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+test -x "$APKSIGNER"
+"$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/debug/app-debug.apk
+sha256sum android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Use the release output path instead when verifying a signed release variant. Keep the checksum and signing-certificate digest with the release record. Test installation and upgrade on a physical device.
+
+## macOS agent build and install
+
+### Prerequisites
+
+- macOS 14 or later
+- Xcode Command Line Tools and Swift
+- Tailscale installed and connected
+- Screen Recording permission for Live Screen; Accessibility for interactive CONTROL mode
+
+Install Command Line Tools if needed:
+
+```sh
+xcode-select --install
+swift --version
+```
+
+### Build and install
+
+From the repository root:
+
+```sh
+git clone https://github.com/PauzeDevs/PauzeControl.git
+cd PauzeControl/mac
 swift package dump-package
 swift build -c release
 ./install.sh
 ```
 
-The install script places the app bundle and LaunchAgent in the current user's home directory. It prints the pairing secret as an explicit installation step. Keep this value private and enter it into the Android app's pairing field.
+The installer places the app bundle at `~/.local/PauzeControl/PauzeControl.app`, registers the LaunchAgent at `~/Library/LaunchAgents/com.pauze.control.plist`, starts the agent, and prints the pairing secret. Keep this secret private and enter it in Android's Device Studio profile. Do not paste it into issues, screenshots, or public logs.
 
-The macOS process is a native agent, not the Android APK. Build and install it on the Mac that will be controlled.
+Logs are written to:
 
-### Permissions and network
+```text
+~/Library/Logs/PauzeControl/stdout.log
+~/Library/Logs/PauzeControl/stderr.log
+```
 
-1. Open macOS System Settings → Privacy & Security.
-2. Allow Screen Recording for PauzeControl if live screen capture is required.
-3. Grant Accessibility to PauzeControl when using Live Screen's CONTROL mode; the agent requests this permission when the first remote input arrives. Grant Input Monitoring only when required by restriction functionality.
-4. Restart PauzeControl after changing Screen Recording permission.
-5. Confirm both devices are connected to Tailscale.
+### macOS permissions
 
-The agent accepts Tailscale IPv4 addresses in 100.64.0.0/10, Tailscale IPv6 addresses in fd7a:115c:a1e0::/48, plus loopback. It is not intended to be publicly exposed on port 47777.
+Open **System Settings → Privacy & Security**.
+
+1. Grant Screen Recording access for Live Screen.
+2. Restart the agent after changing Screen Recording access.
+3. Grant Accessibility when using Live Screen's CONTROL mode.
+4. Enable Input Monitoring only when needed by restriction functionality.
+
+Permission UI can vary between macOS releases. Grant only permissions needed for the features you use.
+
+### Network
+
+Both devices must be connected to the same trusted Tailscale network. Enter the Mac's Tailscale IP or hostname in Android, without a URL path. The agent listens on port 47777 by default and restricts peers to Tailscale address ranges plus loopback.
+
+Do not forward TCP port 47777 to the public internet.
+
+## v1.6.0 beta packaging
+
+The `.github/workflows/android-release.yml` workflow is configured to run when the tag `v1.6.0-beta.1` is pushed. It builds and verifies the Android debug APK, calculates a SHA-256 checksum, and publishes the beta GitHub Release assets. The workflow requires repository Actions write permission. Creating the tag/release is a separate GitHub action; the source branch alone does not make an APK downloadable.
+
+The beta APK is debug-signed and is intended for direct testing, not Google Play distribution. Do not label it production-signed.
 
 ## CI workflows
 
-| Workflow | Purpose | Expected result |
-|---|---|---|
-| Build Android | Runs Gradle assembleDebug on pushes and pull requests | Debug APK artifact |
-| Validate macOS | Runs swift package dump-package, swift build -c debug, per-file Swift parse, and Android tree presence check | Type-checked Swift package and syntax validation |
-| Android APK releases | Builds and verifies a debug APK on the `v1.4.0` tag | Separate beta/debug and stable GitHub channel releases; both assets are debug-signed |
+| Workflow | Purpose |
+| --- | --- |
+| [Build Android](../.github/workflows/build-android.yml) | Runs the Android debug build on pushes, pull requests, and manual dispatch; uploads an APK artifact. |
+| [Validate macOS](../.github/workflows/build-macos.yml) | Builds the Swift package, parses Swift source files, and checks that the Android source tree exists. |
+| [PauzeControl Android Beta Release](../.github/workflows/android-release.yml) | Builds and verifies the v1.6.0 beta APK and publishes the debug-signed APK plus checksum when the beta tag is pushed. |
 
-The CI build validates source/buildability but cannot prove live screen capture, Tailscale routing, macOS privacy permissions, codec stability, or OS power commands work on every device. Complete the smoke tests below before calling a build production-stable.
+CI validates compilation and source structure; it does not confirm runtime behaviour on every Mac/Android device. Before calling v1.6.0 stable, test on physical devices.
 
 ## Release smoke-test checklist
 
-- [ ] Android debug build completes.
-- [ ] Signed release build completes.
-- [ ] apksigner verification succeeds and the checksum is recorded.
+- [ ] Android debug build completes and APK archive verification passes.
 - [ ] APK installs on a physical Android 8.0+ device.
-- [ ] Existing installation upgrades successfully using the same signing key.
-- [ ] Mac agent starts after installation and survives restart/login as expected.
-- [ ] Pairing succeeds over Tailscale; connection fails from an unsupported network peer.
-- [ ] Status telemetry refreshes and reports offline after loss of connectivity.
-- [ ] H.264 streaming starts, stops, reconnects, and survives foreground/background transitions.
-- [ ] Verify 144p, 240p, 360p, 480p, 720p/30, 720p/60, 1080p/30 and 1080p/60 where the Mac display and hardware support them.
+- [ ] Existing installation upgrade works with the same signing key.
+- [ ] Mac agent starts after install and after login/restart as expected.
+- [ ] Pairing works over Tailscale and fails from an unsupported network peer.
+- [ ] Status telemetry refreshes and shows offline after connectivity is lost.
+- [ ] Live screen starts, stops, reconnects, and survives foreground/background changes.
+- [ ] Test supported quality targets on the actual Mac hardware.
 - [ ] Test Screen Recording permission denied/granted and restart after granting.
-- [ ] Verify each remote command deliberately, including restart/shutdown confirmation.
-- [ ] Test malformed HTTP timestamps and Content-Length values in a controlled test environment.
-- [ ] Review agent logs and confirm the pairing secret is not printed during normal startup.
+- [ ] Test profile add/switch/remove and legacy saved-connection migration.
+- [ ] Test theme/accent changes, including returning to the Home screen.
+- [ ] Test clipboard copy in both directions, empty text, and the 24 KiB limit.
+- [ ] Test file upload/download, empty files, chunk order, 50 MiB limit, and overwrite refusal.
+- [ ] Test audio input/output listing and selecting actual Core Audio devices.
+- [ ] Confirm pairing secrets do not appear in normal logs.
+- [ ] Record source tag, commit SHA, CI workflow run, APK SHA-256, signing certificate digest, and device test results.
 
 ## Troubleshooting
 
-**Gradle cannot find the Android SDK:** set ANDROID_HOME/ANDROID_SDK_ROOT and install Platform 35 plus Android Build Tools.
+**Android cannot contact the Mac:** check Tailscale on both endpoints, host/IP, port 47777, agent status, and system-clock accuracy. Re-enter the secret if authentication fails.
 
-**Release signing fails:** confirm that all four environment variables are set, the path is absolute, the key alias exists, and passwords correspond to the same keystore.
+**Live Screen is black:** grant Screen Recording permission and restart the agent; then try 720p/30 FPS.
 
-**Stable channel is not production-signed:** the v1.4.0 workflow publishes debug-signed GitHub channel APKs. A production-signed stable package requires a persistent release keystore and a separate reviewed release workflow.
+**Release signing fails:** check all four environment variables, the absolute keystore path, key alias, and passwords.
 
-**APK update is rejected:** Android requires a matching signing certificate for in-place updates. Use the original keystore. If the APK was signed with a different key, it cannot update the installed package in place.
+**An APK will not update:** Android requires a matching signing certificate for in-place upgrades. Use the original keystore. Uninstalling a conflicting installation clears local preferences.
 
-**Android cannot contact Mac:** verify Tailscale on both endpoints, the host field has no path component, the agent is listening on port 47777, and system clocks are accurate enough for the HMAC timestamp window.
+**A v1.6.0 control is missing or errors:** both Android and the Mac agent must use matching v1.6.0 source. The v1.5.0 APK cannot access the new Device Studio operations.
 
 ## Reproducibility record
 
-When distributing a release, record:
+For each release, record the release tag and source commit SHA, Android versionName/versionCode, JDK/Gradle/SDK versions, CI run, APK SHA-256, signing-certificate digest, device/OS versions, and smoke-test results. Never include a private signing key or password in the record.
 
-- Release tag and source commit SHA
-- Android versionName and versionCode
-- JDK, Gradle, compile SDK, and Build Tools versions
-- CI workflow run URL and final status
-- APK SHA-256
-- Signing certificate digest (from apksigner output; never record the private key/password)
-- Device/OS versions and smoke-test results
+---
 
-The current Android release is v1.4.0 / versionCode 4. Update the versionCode for every future release that needs to install as an update.
+© 2026 PauzeDevs — PauzeControl.
