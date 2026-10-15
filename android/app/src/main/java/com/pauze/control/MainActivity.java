@@ -1005,6 +1005,9 @@ public final class MainActivity extends Activity {
                         showError(
                                 error.getMessage()
                         );
+                        // Reconcile optimistic switch visuals with the Mac's
+                        // actual state after a rejected or interrupted action.
+                        mainHandler.postDelayed(() -> refreshStatus(false), 250L);
                     }
                 }
         );
