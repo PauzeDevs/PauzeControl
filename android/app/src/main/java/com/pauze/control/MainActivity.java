@@ -9,12 +9,14 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -22,6 +24,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,10 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
 
-    private static final int MUTED = Color.rgb(115, 121, 136);
-    private static final int WHITE = Color.WHITE;
-    private static final int GREEN = Color.rgb(70, 220, 150);
-    private static final int AMBER = Color.rgb(255, 193, 7);
+    private static final int MUTED = Color.rgb(133, 117, 106);
+    private static final int WHITE = Color.rgb(248, 240, 232);
+    private static final int GREEN = Color.rgb(38, 107, 75);
+    private static final int AMBER = Color.rgb(149, 87, 64);
 
     private EditText hostInput;
     private EditText tokenInput;
@@ -41,6 +45,9 @@ public final class MainActivity extends Activity {
     private TextView macStateText;
     private TextView macNameText;
     private TextView connectionPill;
+    private TextView activityEmptyTitle;
+    private TextView activityEmptyDetail;
+    private LinearLayout activityTimeline;
 
     private TextView cpuValue;
     private TextView memoryValue;
@@ -60,6 +67,11 @@ public final class MainActivity extends Activity {
     private View systemCard;
     private View powerCard;
     private ScrollView rootScroll;
+    private View pageHome;
+    private View pageControl;
+    private View pageActivity;
+    private View pageSettings;
+    private View[] revealViews;
 
     private TextView navDashboard;
     private TextView navControls;
@@ -115,6 +127,10 @@ public final class MainActivity extends Activity {
     private void bindViews() {
         content = findViewById(R.id.content);
         rootScroll = findViewById(R.id.rootScroll);
+        pageHome = findViewById(R.id.pageHome);
+        pageControl = findViewById(R.id.pageControl);
+        pageActivity = findViewById(R.id.pageActivity);
+        pageSettings = findViewById(R.id.pageSettings);
 
         statusCard = findViewById(R.id.statusCard);
         systemCard = findViewById(R.id.systemCard);
@@ -127,6 +143,9 @@ public final class MainActivity extends Activity {
         macStateText = findViewById(R.id.macStateText);
         macNameText = findViewById(R.id.macNameText);
         connectionPill = findViewById(R.id.connectionPill);
+        activityEmptyTitle = findViewById(R.id.activityTitle);
+        activityEmptyDetail = findViewById(R.id.activityDetail);
+        activityTimeline = findViewById(R.id.activityTimeline);
 
         cpuValue = findViewById(R.id.cpuValue);
         memoryValue = findViewById(R.id.memoryValue);
@@ -293,31 +312,22 @@ public final class MainActivity extends Activity {
 
     private void setupNavigation() {
         navDashboard.setOnClickListener(
-                view -> scrollTo(statusCard, navDashboard)
+                view -> showPage(pageHome, navDashboard)
         );
 
         navControls.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.controlsAnchor),
-                        navControls
-                )
+                view -> showPage(pageControl, navControls)
         );
 
         navActivity.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.activityAnchor),
-                        navActivity
-                )
+                view -> showPage(pageActivity, navActivity)
         );
 
         navSettings.setOnClickListener(
-                view -> scrollTo(
-                        findViewById(R.id.settingsAnchor),
-                        navSettings
-                )
+                view -> showPage(pageSettings, navSettings)
         );
 
-        selectNavigation(navDashboard);
+        showPage(pageHome, navDashboard);
     }
 
     private void selectNavigation(TextView selected) {
@@ -339,31 +349,33 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void scrollTo(
-            View target,
+    private void showPage(
+            View page,
             TextView selected
     ) {
-        rootScroll.post(
-                () -> rootScroll.smoothScrollTo(
-                        0,
-                        Math.max(
-                                0,
-                                target.getTop() - 20
-                        )
-                )
-        );
+        pageHome.setVisibility(page == pageHome ? View.VISIBLE : View.GONE);
+        pageControl.setVisibility(page == pageControl ? View.VISIBLE : View.GONE);
+        pageActivity.setVisibility(page == pageActivity ? View.VISIBLE : View.GONE);
+        pageSettings.setVisibility(page == pageSettings ? View.VISIBLE : View.GONE);
+
+        rootScroll.post(() -> {
+            rootScroll.scrollTo(0, 0);
+            if (revealViews != null) {
+                refreshRevealStates(revealViews);
+            }
+        });
 
         selectNavigation(selected);
 
         selected.animate()
-                .scaleX(1.08f)
-                .scaleY(1.08f)
-                .setDuration(120)
+                .scaleX(1.04f)
+                .scaleY(1.04f)
+                .setDuration(110)
                 .withEndAction(
                         () -> selected.animate()
                                 .scaleX(1f)
                                 .scaleY(1f)
-                                .setDuration(180)
+                                .setDuration(160)
                                 .start()
                 )
                 .start();
@@ -389,6 +401,8 @@ public final class MainActivity extends Activity {
                 tokenInput,
                 findViewById(R.id.saveButton)
         };
+
+        revealViews = views;
 
         for (View view : views) {
             view.setAlpha(0f);
@@ -696,6 +710,14 @@ public final class MainActivity extends Activity {
         setStatus(
                 "Live • synced with your Mac"
         );
+
+        if (showErrors) {
+            recordActivity(
+                    "Connection verified",
+                    "Secure connection to " + host,
+                    true
+            );
+        }
     }
 
     private void updateState(
@@ -941,12 +963,23 @@ public final class MainActivity extends Activity {
                             );
                         }
 
+                        recordActivity(
+                                "Remote command completed",
+                                commandDescription(endpoint),
+                                true
+                        );
+
                         mainHandler.postDelayed(
                                 () -> refreshStatus(false),
                                 250L
                         );
 
                     } catch (Exception error) {
+                        recordActivity(
+                                "Remote command failed",
+                                error.getMessage(),
+                                false
+                        );
                         showError(
                                 error.getMessage()
                         );
@@ -1003,8 +1036,18 @@ public final class MainActivity extends Activity {
                                         volume +
                                         "%."
                         );
+                        recordActivity(
+                                "Volume updated",
+                                "Mac output volume set to " + volume + "%",
+                                true
+                        );
 
                     } catch (Exception error) {
+                        recordActivity(
+                                "Volume update failed",
+                                error.getMessage(),
+                                false
+                        );
                         showError(
                                 error.getMessage()
                         );
@@ -1088,11 +1131,113 @@ public final class MainActivity extends Activity {
         mainHandler.post(() -> {
             consecutiveStatusFailures++;
             if (consecutiveStatusFailures >= STATUS_FAILURES_BEFORE_OFFLINE) {
+                if (consecutiveStatusFailures == STATUS_FAILURES_BEFORE_OFFLINE) {
+                    recordActivity(
+                            "Connection lost",
+                            "Unable to reach the Mac. Retrying automatically.",
+                            false
+                    );
+                }
                 statusText.setText("Connection lost • retrying…");
                 connectionPill.setText("● OFFLINE");
                 connectionPill.setTextColor(MUTED);
             }
         });
+    }
+
+    private String commandDescription(String endpoint) {
+        switch (endpoint) {
+            case "/v1/restrict": return "Mac restriction enabled";
+            case "/v1/allow": return "Mac restriction disabled";
+            case "/v1/lock": return "Mac locked";
+            case "/v1/sleep": return "Sleep command sent";
+            case "/v1/restart": return "Restart command sent";
+            case "/v1/shutdown": return "Shutdown command sent";
+            case "/v1/mute": return "Mac audio muted";
+            case "/v1/unmute": return "Mac audio unmuted";
+            default: return "Command sent to the Mac";
+        }
+    }
+
+    private void recordActivity(
+            String title,
+            String detail,
+            boolean successful
+    ) {
+        mainHandler.post(() -> {
+            if (activityTimeline == null) {
+                return;
+            }
+
+            activityEmptyTitle.setVisibility(View.GONE);
+            activityEmptyDetail.setVisibility(View.GONE);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(13), dp(11), dp(13), dp(11));
+            row.setBackgroundResource(R.drawable.card_metric);
+
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+            rowParams.topMargin = dp(8);
+
+            LinearLayout heading = new LinearLayout(this);
+            heading.setOrientation(LinearLayout.HORIZONTAL);
+            heading.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            TextView titleView = new TextView(this);
+            titleView.setText(title);
+            titleView.setTextColor(Color.parseColor(
+                    successful ? "#955740" : "#8F3C2F"
+            ));
+            titleView.setTextSize(12);
+            titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            titleView.setMaxLines(2);
+
+            LinearLayout.LayoutParams titleParams =
+                    new LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f
+                    );
+            heading.addView(titleView, titleParams);
+
+            TextView timeView = new TextView(this);
+            timeView.setText(new SimpleDateFormat(
+                    "HH:mm:ss",
+                    Locale.getDefault()
+            ).format(new Date()));
+            timeView.setTextColor(Color.parseColor("#85756A"));
+            timeView.setTextSize(10);
+            heading.addView(timeView);
+
+            TextView detailView = new TextView(this);
+            detailView.setText(detail == null || detail.trim().isEmpty()
+                    ? "No additional details"
+                    : detail);
+            detailView.setTextColor(Color.parseColor("#51433B"));
+            detailView.setTextSize(11);
+            detailView.setPadding(0, dp(5), 0, 0);
+
+            row.addView(heading);
+            row.addView(detailView);
+            activityTimeline.addView(row, 0, rowParams);
+
+            while (activityTimeline.getChildCount() > 12) {
+                activityTimeline.removeViewAt(
+                        activityTimeline.getChildCount() - 1
+                );
+            }
+        });
+    }
+
+    private int dp(float value) {
+        return Math.round(
+                value * getResources().getDisplayMetrics().density
+        );
     }
 
     private void setStatus(

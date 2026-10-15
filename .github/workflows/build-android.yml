@@ -27,5 +27,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PauzeControl-android-debug
+          name: PauzeControl-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 90

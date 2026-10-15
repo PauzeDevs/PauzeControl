@@ -44,7 +44,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="PAUZE"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#28211E"
                     android:textSize="30sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.11" />
@@ -54,7 +54,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="CONTROL CENTER"
-                    android:textColor="#717A8C"
+                    android:textColor="#85756A"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.24" />
@@ -70,19 +70,44 @@
                 android:paddingEnd="12dp"
                 android:paddingBottom="8dp"
                 android:text="● OFFLINE"
-                android:textColor="#9AA0AD"
+                android:textColor="#85756A"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
 
 
+        <LinearLayout
+            android:id="@+id/pageHome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Overview"
+                android:textColor="#28211E"
+                android:textSize="27sp"
+                android:textStyle="bold"
+                android:letterSpacing="-0.02" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Your Mac at a glance"
+                android:textColor="#85756A"
+                android:textSize="13sp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="YOUR MAC"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -101,7 +126,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Mac"
-                android:textColor="#FFFFFF"
+                android:textColor="#28211E"
                 android:textSize="23sp"
                 android:textStyle="bold" />
 
@@ -111,14 +136,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
                 android:text="Not connected"
-                android:textColor="#8E96A6"
+                android:textColor="#85756A"
                 android:textSize="13sp" />
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="15dp"
-                android:background="#252D3C" />
+                android:background="#D6AA91" />
 
             <TextView
                 android:id="@+id/statusText"
@@ -126,7 +151,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:text="Waiting for connection…"
-                android:textColor="#C7CBD4"
+                android:textColor="#51433B"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -135,7 +160,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="SYSTEM"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -166,7 +191,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="CPU"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -176,7 +201,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="17sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -194,7 +219,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="MEMORY"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -204,7 +229,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -228,7 +253,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="DISK"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -238,7 +263,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -256,7 +281,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="BATTERY"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -266,7 +291,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -290,7 +315,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="UPTIME"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -300,7 +325,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -318,7 +343,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="macOS"
-                        android:textColor="#747E90"
+                        android:textColor="#85756A"
                         android:textSize="8sp"
                         android:textStyle="bold" />
 
@@ -328,12 +353,39 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="—"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#28211E"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageControl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Control"
+                android:textColor="#28211E"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Manage your Mac remotely"
+                android:textColor="#85756A"
+                android:textSize="13sp" />
 
         <TextView
             android:id="@+id/controlsAnchor"
@@ -341,7 +393,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="QUICK CONTROL"
-            android:textColor="#8D82FF"
+            android:textColor="#955740"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -388,7 +440,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="LIVE SCREEN"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#28211E"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -397,7 +449,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
                     android:text="View your Mac remotely • up to 1080p / 60 FPS"
-                    android:textColor="#818A9B"
+                    android:textColor="#85756A"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -407,7 +459,7 @@
                 android:background="@drawable/button_primary"
                 android:gravity="center"
                 android:text="›"
-                android:textColor="#FFFFFF"
+                android:textColor="#28211E"
                 android:textSize="24sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -417,7 +469,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="POWER &amp; AUDIO"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -466,14 +518,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="12dp"
-                android:background="#252D3C" />
+                android:background="#D6AA91" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="11dp"
                 android:text="OUTPUT VOLUME"
-                android:textColor="#747E90"
+                android:textColor="#85756A"
                 android:textSize="8sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.10" />
@@ -497,7 +549,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="end"
                     android:text="—"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#28211E"
                     android:textSize="12sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -517,7 +569,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="SECURITY"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -534,7 +586,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Private remote access"
-                android:textColor="#FFFFFF"
+                android:textColor="#28211E"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -543,7 +595,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
                 android:text="Pairing secrets stay on the phone and commands are authenticated before reaching your Mac."
-                android:textColor="#818A9B"
+                android:textColor="#85756A"
                 android:textSize="11sp" />
 
             <TextView
@@ -557,13 +609,40 @@
                 android:letterSpacing="0.05" />
         </LinearLayout>
 
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageActivity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Activity"
+                android:textColor="#28211E"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Recent connection and control events"
+                android:textColor="#85756A"
+                android:textSize="13sp" />
+
         <TextView
             android:id="@+id/activityAnchor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="RECENT ACTIVITY"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -582,7 +661,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="No activity yet"
-                android:textColor="#FFFFFF"
+                android:textColor="#28211E"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -592,9 +671,43 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
                 android:text="Connect your Mac to start recording remote-control events."
-                android:textColor="#818A9B"
+                android:textColor="#85756A"
                 android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/activityTimeline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical" />
         </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pageSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Settings"
+                android:textColor="#28211E"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="Connection and pairing"
+                android:textColor="#85756A"
+                android:textSize="13sp" />
 
         <TextView
             android:id="@+id/settingsAnchor"
@@ -602,7 +715,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="26dp"
             android:text="CONNECTION"
-            android:textColor="#717A8C"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.18" />
@@ -618,8 +731,8 @@
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:singleLine="true"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#626B7B" />
+            android:textColor="#28211E"
+            android:textColorHint="#85756A" />
 
         <EditText
             android:id="@+id/tokenInput"
@@ -632,8 +745,8 @@
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:singleLine="true"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#626B7B" />
+            android:textColor="#28211E"
+            android:textColorHint="#85756A" />
 
         <com.pauze.control.SlideActionView
             android:id="@+id/saveButton"
@@ -642,6 +755,8 @@
             android:layout_marginTop="8dp"
             android:contentDescription="Save Mac connection"
             android:text="SAVE CONNECTION" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/githubLink"
@@ -654,7 +769,7 @@
             android:paddingEnd="8dp"
             android:paddingBottom="4dp"
             android:text="GitHub  •  github.com/PauzeDevs/PauzeControl"
-            android:textColor="#7F8CFF"
+            android:textColor="#955740"
             android:textSize="11sp"
             android:textStyle="bold"
             android:clickable="true"
@@ -667,7 +782,7 @@
             android:layout_marginTop="5dp"
             android:gravity="center"
             android:text="© 2026 PauzeDevs • PauzeControl"
-            android:textColor="#4F5868"
+            android:textColor="#85756A"
             android:textSize="9sp"
             android:letterSpacing="0.06" />
 
@@ -695,7 +810,7 @@
             android:gravity="center"
             android:minHeight="48dp"
             android:text="HOME"
-            android:textColor="#FFFFFF"
+            android:textColor="#28211E"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.06"
@@ -710,7 +825,7 @@
             android:gravity="center"
             android:minHeight="48dp"
             android:text="CONTROL"
-            android:textColor="#737988"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.03"
@@ -725,7 +840,7 @@
             android:gravity="center"
             android:minHeight="48dp"
             android:text="ACTIVITY"
-            android:textColor="#737988"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.03"
@@ -740,7 +855,7 @@
             android:gravity="center"
             android:minHeight="48dp"
             android:text="SETTINGS"
-            android:textColor="#737988"
+            android:textColor="#85756A"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.03"
