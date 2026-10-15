@@ -46,7 +46,7 @@ enum FileTransferStore {
         let cutoff = Date().addingTimeInterval(-maximumStagingAge)
         var remainingBytes: Int64 = 0
         for url in urls {
-            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
             if values?.isSymbolicLink == true {
                 try? fm.removeItem(at: url)
                 continue
