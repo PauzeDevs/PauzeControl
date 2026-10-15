@@ -33,8 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
 
-    private static final int MUTED = Color.rgb(115, 121, 136);
-    private static final int WHITE = Color.WHITE;
+    private static final int MUTED = Color.rgb(133, 117, 106);
+    private static final int WHITE = Color.rgb(40, 33, 30);
     private static final int GREEN = Color.rgb(70, 220, 150);
     private static final int AMBER = Color.rgb(255, 193, 7);
 
