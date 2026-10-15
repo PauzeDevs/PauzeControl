@@ -756,6 +756,14 @@
             android:contentDescription="Save Mac connection"
             android:text="SAVE CONNECTION" />
 
+            <com.pauze.control.SlideActionView
+                android:id="@+id/featureStudioButton"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="16dp"
+                android:contentDescription="Open device, transfer, clipboard, audio and personalization tools"
+                android:text="DEVICE STUDIO" />
+
         </LinearLayout>
 
         <TextView

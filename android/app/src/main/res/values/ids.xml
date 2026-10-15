@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="pauzeOriginalTextColor" type="id" />
+    <item name="pauzeSurfaceView" type="id" />
+    <item name="pauzeAccentView" type="id" />
+</resources>

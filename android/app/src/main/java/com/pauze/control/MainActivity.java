@@ -121,6 +121,8 @@ public final class MainActivity extends Activity {
         setupRevealAnimations();
         setupNavigation();
         setupActions();
+        Personalization.apply(this);
+        migrateLegacyConnection();
         loadSavedConnection();
     }
 
@@ -176,6 +178,12 @@ public final class MainActivity extends Activity {
                 R.id.statusButton,
                 "REFRESH STATUS",
                 () -> refreshStatus(true)
+        );
+
+        setupToggleAction(
+                R.id.featureStudioButton,
+                "DEVICE STUDIO",
+                () -> startActivity(new Intent(this, FeatureStudioActivity.class))
         );
 
         restrictionControl.setText(
@@ -533,9 +541,27 @@ public final class MainActivity extends Activity {
                 .start();
     }
 
+    private void migrateLegacyConnection() {
+        android.content.SharedPreferences connection =
+                getSharedPreferences("pauze_connection", MODE_PRIVATE);
+        if (connection.contains("host")) {
+            return;
+        }
+
+        // Before Device Studio, MainActivity used Activity.getPreferences(), which
+        // stores its values under the activity's local class name. Preserve that host
+        // on upgrade instead of leaving existing installations disconnected.
+        android.content.SharedPreferences legacy =
+                getSharedPreferences(getLocalClassName(), MODE_PRIVATE);
+        String legacyHost = legacy.getString("host", "");
+        if (legacyHost != null && !legacyHost.trim().isEmpty()) {
+            connection.edit().putString("host", legacyHost.trim()).apply();
+        }
+    }
+
     private void loadSavedConnection() {
         String host =
-                getPreferences(MODE_PRIVATE)
+                getSharedPreferences("pauze_connection", MODE_PRIVATE)
                         .getString(
                                 "host",
                                 ""
@@ -589,7 +615,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        getPreferences(MODE_PRIVATE)
+        getSharedPreferences("pauze_connection", MODE_PRIVATE)
                 .edit()
                 .putString("host", host)
                 .apply();
@@ -1321,6 +1347,8 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         activityResumed = true;
+        Personalization.apply(this);
+        syncConnectionFromSavedStore();
 
         mainHandler.removeCallbacks(
                 statusPoll
@@ -1330,6 +1358,28 @@ public final class MainActivity extends Activity {
                 statusPoll,
                 1200L
         );
+    }
+
+    private void syncConnectionFromSavedStore() {
+        if (hostInput == null || tokenInput == null || secureStore == null || executor == null) {
+            return;
+        }
+        String savedHost = getSharedPreferences("pauze_connection", MODE_PRIVATE)
+                .getString("host", "");
+        if (!hostInput.hasFocus() && !savedHost.equals(hostInput.getText().toString().trim())) {
+            hostInput.setText(savedHost);
+        }
+        executor.execute(() -> {
+            try {
+                String savedToken = secureStore.getToken();
+                mainHandler.post(() -> {
+                    if (!isFinishing() && tokenInput != null && !tokenInput.hasFocus()) {
+                        tokenInput.setText(savedToken);
+                    }
+                });
+            } catch (Exception ignored) {
+            }
+        });
     }
 
     @Override

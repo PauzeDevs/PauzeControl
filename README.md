@@ -8,12 +8,19 @@ PauzeControl consists of an Android controller and a native macOS agent. They co
 >
 > **Release scope:** v1.5.0 updates the Android app design and live-screen zoom only. No files under `mac/` changed; the Mac agent does not need a source-code update.
 >
+> **Upcoming source update:** the `main` branch is being prepared for v1.6.0 with Device Studio, multi-Mac profiles, Personalisation Studio, manual clipboard transfer, secure file transfer and audio-device selection. These changes are not included in the currently downloadable v1.5.0 APK; no v1.6.0 release has been published. See [v1.6.0 development notes](docs/RELEASE_NOTES_v1.6.0.md).
+>
 > **Signing:** Both channel APKs are debug-signed direct GitHub downloads. The stable channel is not a production-signed or Google Play release. Android may reject an in-place update if the signing certificate differs from the installed APK. See [Build notes](docs/BUILD_NOTES.md).
 
 ## Features
 
 ### Android control center
 - Four persistent navigation tabs: Home, Control, Activity, and Settings.
+- Device Studio with saved Mac profiles; each profile pairing secret is encrypted using Android Keystore-backed AES-GCM.
+- Personalisation Studio with Warm Paper, Midnight and Ocean themes, selectable accent colours and compact spacing.
+- Explicit, user-triggered clipboard transfer in either direction; no background clipboard collection.
+- Authenticated chunked file transfer to a dedicated macOS application-support folder with a 50 MiB per-file limit.
+- Native macOS system-default output and input device selection.
 - Connection card and live macOS system dashboard.
 - Remote restriction/allow commands, lock, sleep, restart, shutdown, mute/unmute, and volume control.
 - Connection status and automatic refresh while the app is foregrounded.
