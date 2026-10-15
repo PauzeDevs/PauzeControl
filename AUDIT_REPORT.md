@@ -13,9 +13,9 @@ All changes are being made on `feat/live-screen-system-audio` / draft PR #12. Th
 
 | Check | Result at the time of this report |
 |---|---|
-| Android Gradle debug build | Must pass on the latest branch head before the remediation pass is considered CI-verified |
-| macOS Swift package build and parse | Must pass on the latest branch head before the remediation pass is considered CI-verified |
-| File transfer, Core Audio device switching, mute permissions, restriction enforcement, live audio/video synchronization | Requires paired Mac + Android runtime testing |
+| Android Gradle debug build | Passed on code head 24c42d95575aac83c654bcbf10d673c4dadc0504; later commits in this pass are documentation-only |
+| macOS Swift package build and parse | Passed on code head 24c42d95575aac83c654bcbf10d673c4dadc0504; later commits in this pass are documentation-only |
+| File transfer, Core Audio device switching, mute permissions, restriction enforcement, live audio/video timing | Requires paired Mac + Android runtime testing |
 | Release integrity | Existing assets are protected by an explicit no-overwrite guard in the one-time v1.6.0 beta workflow |
 
 ## Critical
@@ -93,15 +93,15 @@ All changes are being made on `feat/live-screen-system-audio` / draft PR #12. Th
 
 The following changes were committed to the existing draft branch during the follow-up audit:
 
-- **Credential migration:** Android secure storage now tries the current V3 Keystore key, falls back to decrypting V2 values, then persists the recovered token/profile secret encrypted with V3. Removing the active saved device also clears its global saved connection, and updating the currently active profile refreshes its credential.
-- **File-transfer bounds:** Upload validation now checks `offset <= total` and compares the chunk size against `total - offset`, avoiding an overflow-prone addition. Staging cleanup removes partial uploads older than 24 hours and caps reserved staging at 100 MiB.
-- **Audio controls:** Corrected the AppleScript `set volume output muted true/false` syntax for mute/unmute. macOS subprocess failures now return the captured diagnostic instead of hiding all stderr, which should make remaining permission errors actionable.
-- **Restriction enforcement:** The Mac no longer reports a successful restriction if it could not create the input-blocking event tap. The endpoint returns HTTP 503 with a permissions explanation and the failed startup path clears the persisted restricted state.
-- **Release safety:** The one-time beta workflow refuses to run when the existing v1.6.0 beta tag/release is present, and no longer permits asset overwrites. No release was deleted or modified by this audit.
-- **Screen capture reliability:** Retry attempts now accumulate across rapid failures, use capped progressive delay, and reset only after a 30-second healthy capture interval.
-- **H.264 buffer safety:** The encoder output parser copies CoreMedia block buffers into owned contiguous data before indexing, and rejects access units over the Android client's 5 MiB parser limit.
-- **Remote input ordering:** Pointer and typing requests are serialized through a single Android executor rather than creating an unbounded new thread per action.
-- **Diagnostics/metadata:** Updated the macOS bundle version to 1.6.0, and this report/build notes are being aligned with the current workflow behavior.
+- **Credential migration and profile lifecycle:** Android secure storage decrypts V3 values first, falls back to existing V2 values, then persists recovered tokens/profile secrets encrypted under V3. Removing the active profile clears the global token/host, and updating the active profile re-activates it with the new secret. The host is persisted only after token encryption succeeds.
+- **File-transfer validation and integrity:** Upload offsets are checked without overflow-prone addition. A staging sidecar binds every chunk to the first chunk's filename and declared total size, preventing a transfer ID from changing metadata mid-upload. Symlinks are rejected; abandoned partial uploads older than 24 hours are cleaned up; staging is capped at 100 MiB and 16 concurrent sessions. Android verifies each download chunk's status, filename, offset and total, including zero-byte files.
+- **Audio controls and diagnostics:** Corrected the mute/unmute AppleScript syntax. macOS subprocess stderr now reaches the API error instead of being hidden. Audio-device listing tolerates a temporarily absent default device and client operations check response status.
+- **Restriction enforcement:** macOS fails closed if it cannot create the input-blocking event tap; the restrict endpoint returns HTTP 503 with a permissions explanation. Android displays the real input-blocking status and reconciles optimistic toggle state after rejected commands.
+- **Release safety:** The one-time v1.6.0 beta workflow fails if the published tag/release exists and disallows asset overwrites. No release or published asset was deleted or modified.
+- **Capture/listener reliability:** Screen capture retry attempts accumulate through repeated failures, use capped progressive backoff and reset after a 30-second healthy interval. The Mac control listener exposes health and the LaunchAgent retries startup/failed listener states.
+- **H.264 and live A/V:** H.264 access units are copied from possibly segmented CoreMedia buffers before parsing and capped at the Android 5 MiB limit. Audio/video packets share a local monotonic presentation-time mapping on Android; video renders are timestamp-scheduled and audio writes are paced by packet PTS. Audio packets no longer starve video packets on a constrained connection. Synchronization remains subject to physical-device output latency and jitter tests.
+- **Input/UI correctness:** Android control mode serializes mouse/typing requests, surfaces CoreGraphics creation failures, ignores duplicate switch taps while animations dispatch, uses the captured click state for mute/restriction commands, and removes touch-intercepting invisible viewer overlays. AudioTrack negative writes are reported and shut down cleanly; zero-byte writes are retried without dropping the chunk.
+- **Diagnostics/metadata:** macOS bundle version is aligned to 1.6.0; user-facing API errors include Core Audio/subprocess failure details.
 
 ## Required final verification
 
@@ -110,6 +110,7 @@ The following changes were committed to the existing draft branch during the fol
 3. On paired devices, test zero-byte and large file transfers, interrupted/retried uploads, duplicate filenames, storage exhaustion, and hostile offset values.
 4. Verify mute/unmute and input/output device switching on the actual macOS version and audio devices; capture the returned diagnostic if a permission prompt remains.
 5. Test restriction with Input Monitoring granted and denied, plus restart while restricted; verify the app never claims input is blocked when the event tap is absent.
-6. Test video/audio start-stop, reconnect, audio opt-in, packet timing, surface rotation/backgrounding, and sustained CPU/network/battery use. A/V synchronization is not certified by the compile checks alone.
+6. Test video/audio start-stop, reconnect, audio opt-in, packet timing, surface rotation/backgrounding, and sustained CPU/network/battery use. Verify the best-effort PTS schedule on multiple Android devices and measure any persistent lead/lag.
+7. Confirm listener recovery by making port 47777 unavailable at startup, then freeing it; verify the 20-second health timer rebinds the port without restarting the LaunchAgent.
 
 The current branch should not be described as fully runtime-verified until those device checks are complete. File any newly reproduced issue with logs and device/OS versions rather than marking it fixed based only on compilation.
