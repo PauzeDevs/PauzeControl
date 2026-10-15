@@ -192,7 +192,7 @@ public final class MainActivity extends Activity {
         );
         restrictionControl.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        view.isChecked() ? "/v1/restrict" : "/v1/allow"
+                        view.getLastActivatedChecked() ? "/v1/restrict" : "/v1/allow"
                 )
         );
 
@@ -233,7 +233,7 @@ public final class MainActivity extends Activity {
         );
         muteButton.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        view.isChecked() ? "/v1/mute" : "/v1/unmute"
+                        view.getLastActivatedChecked() ? "/v1/mute" : "/v1/unmute"
                 )
         );
 
