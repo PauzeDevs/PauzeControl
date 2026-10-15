@@ -161,7 +161,8 @@ public final class ScreenStreamClient {
 
             if (version != 1 ||
                     headerLength != HEADER_SIZE ||
-                    (flags & ~0x03) != 0) {
+                    (flags & ~0x03) != 0 ||
+                    flags == 0x03) {
                 throw new IllegalStateException(
                         "Unsupported PZV1 stream packet."
                 );
