@@ -1174,15 +1174,17 @@ public final class ScreenActivity extends Activity
             audioPlaybackRunning = true;
 
             audioPlaybackThread = new Thread(
-                    this::audioPlaybackLoop,
+                    () -> audioPlaybackLoop(candidate),
                     "PauzeControl-LiveAudio"
             );
             audioPlaybackThread.start();
         }
     }
 
-    private void audioPlaybackLoop() {
-        while (audioPlaybackRunning && !Thread.currentThread().isInterrupted()) {
+    private void audioPlaybackLoop(AudioTrack playbackTrack) {
+        while (audioPlaybackRunning &&
+                isCurrentAudioTrack(playbackTrack) &&
+                !Thread.currentThread().isInterrupted()) {
             final byte[] chunk;
             try {
                 chunk = audioBuffers.poll(250, TimeUnit.MILLISECONDS);
@@ -1193,14 +1195,11 @@ public final class ScreenActivity extends Activity
             if (chunk == null) continue;
 
             int offset = 0;
-            while (offset < chunk.length && audioPlaybackRunning) {
-                AudioTrack activeTrack;
-                synchronized (audioLock) {
-                    activeTrack = audioTrack;
-                }
-                if (activeTrack == null) break;
-
-                int written = activeTrack.write(
+            while (offset < chunk.length &&
+                    audioPlaybackRunning &&
+                    isCurrentAudioTrack(playbackTrack) &&
+                    !Thread.currentThread().isInterrupted()) {
+                int written = playbackTrack.write(
                         chunk,
                         offset,
                         chunk.length - offset,
@@ -1210,6 +1209,12 @@ public final class ScreenActivity extends Activity
                 if (written == 0) break;
                 offset += written;
             }
+        }
+    }
+
+    private boolean isCurrentAudioTrack(AudioTrack expectedTrack) {
+        synchronized (audioLock) {
+            return audioTrack == expectedTrack;
         }
     }
 
