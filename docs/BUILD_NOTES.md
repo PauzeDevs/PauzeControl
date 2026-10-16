@@ -6,7 +6,7 @@ This guide covers local builds, signing, installation checks, and release verifi
 
 - **Source version on `main`:** v1.6.0 / Android version code 6.
 - **Latest published stable APK:** [PauzeControl v1.5.0](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.5.0).
-- **v1.6.0 Beta 1:** the beta workflow publishes tag `v1.6.0-beta.1` when the marked release-preparation commit is merged to `main`. The workflow creates the GitHub prerelease and attaches a verified debug APK plus checksum. Until its assets are uploaded, use the source-build steps below.
+- **v1.6.0 Beta 1:** already published at [v1.6.0-beta.1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1). The one-time workflow now fails closed if that tag or release already exists; it must not be reused to overwrite the existing APK.
 - **Package:** `com.pauze.control`.
 - **Android minimum:** API 26 (Android 8.0); compile/target SDK 35.
 - **Android toolchain:** JDK 17 and Gradle 8.9.
@@ -155,7 +155,7 @@ Do not forward TCP port 47777 to the public internet.
 
 ## v1.6.0 beta packaging
 
-The `.github/workflows/android-release.yml` workflow runs on pushes to `main`, but publishes only when the merge commit title contains the marker `[release-v1.6.0-beta]`. It builds and verifies the Android debug APK, calculates a SHA-256 checksum, creates tag `v1.6.0-beta.1`, and publishes the prerelease assets. Ordinary main-branch pushes skip the release job. The workflow requires repository Actions write permission.
+The `.github/workflows/android-release.yml` workflow is a one-time v1.6.0 beta publisher. It is gated by the `[release-v1.6.0-beta]` commit marker, but now fails early if tag `v1.6.0-beta.1` or its GitHub Release already exists. It must not replace the existing APK or checksum. For any future version, create a reviewed workflow with a new tag/version and immutable-asset behavior.
 
 The beta APK is debug-signed and is intended for direct testing, not Google Play distribution. Do not label it production-signed.
 
@@ -165,7 +165,7 @@ The beta APK is debug-signed and is intended for direct testing, not Google Play
 | --- | --- |
 | [Build Android](../.github/workflows/build-android.yml) | Runs the Android debug build on pushes, pull requests, and manual dispatch; uploads an APK artifact. |
 | [Validate macOS](../.github/workflows/build-macos.yml) | Builds the Swift package, parses Swift source files, and checks that the Android source tree exists. |
-| [PauzeControl Android Beta Release](../.github/workflows/android-release.yml) | Builds and verifies the v1.6.0 beta APK and publishes the debug-signed APK plus checksum when the beta tag is pushed. |
+| [PauzeControl Android Beta Release](../.github/workflows/android-release.yml) | One-time v1.6.0 beta workflow; intentionally fails closed when its existing tag/release is present to protect published assets. |
 
 CI validates compilation and source structure; it does not confirm runtime behaviour on every Mac/Android device. Before calling v1.6.0 stable, test on physical devices.
 

@@ -1,21 +1,22 @@
 # PauzeControl — Repository Audit Remediation Report
 
 **Original audit:** 2026-10-12  
-**Remediation pass:** 2026-10-12  
-**Scope:** Android Java/XML application, H.264 viewer/client, macOS Swift agent, HTTP/HMAC layer, process invocation, launcher assets, and GitHub Actions release workflows.  
-**Method:** Code review, resource/reference checks, and GitHub Actions build/type-checks. No live adversarial network test or device/codec stress test has been run.
+**Follow-up remediation pass:** 2026-10-16  
+**Scope:** Android Java/XML application, H.264 viewer/client, macOS Swift agent, HTTP/HMAC layer, audio and file transfer, profile/key storage, installer, and GitHub Actions workflows.  
+**Method:** Static source review and GitHub Actions build/type-checks. No live adversarial network test or paired-device test is claimed.
 
-## Outcome
+## Outcome and scope limits
 
-All 15 findings from the prior audit have been addressed in the current PR branch. Remediations are reflected in source/configuration below; this report does not claim that unperformed runtime penetration and device tests have passed.
+The October 12 counts below describe the previous audit snapshot only. Follow-up review on October 16 found additional defects; current changes and remaining device-only verification are recorded in the addendum at the end of this report. Passing CI demonstrates compilation, not operational correctness.
 
-| Severity from original audit | Findings | Status |
-|---|---:|---|
-| Critical | 2 | Fixed in code |
-| High | 5 | Fixed in code/configuration |
-| Medium | 6 | Fixed or mitigated in code |
-| Low | 2 | Fixed in code/documentation |
-| **Total** | **15** | **Remediated; final CI runs must pass** |
+All changes are being made on `feat/live-screen-system-audio` / draft PR #12. They have not been merged into `main`, and no GitHub Release or published release asset was edited.
+
+| Check | Result at the time of this report |
+|---|---|
+| Android Gradle debug build | Passed on code head 24c42d95575aac83c654bcbf10d673c4dadc0504; later commits in this pass are documentation-only |
+| macOS Swift package build and parse | Passed on code head 24c42d95575aac83c654bcbf10d673c4dadc0504; later commits in this pass are documentation-only |
+| File transfer, Core Audio device switching, mute permissions, restriction enforcement, live audio/video timing | Requires paired Mac + Android runtime testing |
+| Release integrity | Existing assets are protected by an explicit no-overwrite guard in the one-time v1.6.0 beta workflow |
 
 ## Critical
 
@@ -40,9 +41,10 @@ All 15 findings from the prior audit have been addressed in the current PR branc
 ### H-03 — Release workflow depended on a missing Gradle wrapper
 - **Fix:** Replaced `./gradlew` calls with a configured Gradle 8.9 installation in `.github/workflows/android-release.yml`.
 
-### H-04 — Release artifact was not guaranteed to be signed
-- **Fix:** Added environment-driven release signing in `android/app/build.gradle`. The release workflow validates the keystore, builds the release APK, verifies its signature with `apksigner`, and uploads/attaches only the expected signed APK.
-- **Required repository configuration:** Before running the tag/manual release workflow, configure these GitHub Actions repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. The workflow intentionally fails closed when they are absent. The private release keystore must remain outside the repository.
+### H-04 — Release artifact signing and overwrite safety
+- **Current behavior:** `android/app/build.gradle` supports environment-driven signing for the `assembleRelease` variant. The one-time `android-release.yml` beta workflow deliberately publishes a debug-signed testing APK, not a production-signed or Google Play build.
+- **Follow-up fix:** Added an early guard that fails if `v1.6.0-beta.1` tag or release already exists and disabled asset overwrites. This protects the already-published beta from accidental replacement.
+- **Before a future production-signed release:** Use a separate new-version workflow and configure the documented private signing key/secrets. The current one-time beta workflow is not a reusable release pipeline.
 
 ### H-05 — H.264 decoder was accessed across lifecycle and stream threads
 - **Fix:** Decoder frame operations and release are synchronized, and surface creation/destruction/activity teardown use the same monitor before mutating decoder surface state or releasing codec resources.
@@ -87,8 +89,28 @@ All 15 findings from the prior audit have been addressed in the current PR branc
 - Requests that carry a body without a valid Content-Length are rejected.
 - Periodic Android status polls are now single-flight, preventing slow timeouts from building an unbounded executor queue.
 
-## Remaining verification
+## Follow-up remediation — 2026-10-16
 
-1. Configure the four release-signing secrets before the first tagged/manual release build; this environment cannot create repository secrets or access your private release keystore.
-2. After final CI passes, run a runtime test matrix on a Mac and Android device: stream start/stop/reconnect, rotation/backgrounding, all quality/FPS selections, low bandwidth, denied Screen Recording/Input Monitoring permissions, and malformed HTTP requests against the agent.
-3. Keep this report as a remediation record. Any new issue discovered during device/runtime testing should be filed separately rather than silently treated as already resolved.
+The following changes were committed to the existing draft branch during the follow-up audit:
+
+- **Credential migration and profile lifecycle:** Android secure storage decrypts V3 values first, falls back to existing V2 values, then persists recovered tokens/profile secrets encrypted under V3. Removing the active profile clears the global token/host, and updating the active profile re-activates it with the new secret. The host is persisted only after token encryption succeeds.
+- **File-transfer validation and integrity:** Upload offsets are checked without overflow-prone addition. A staging sidecar binds every chunk to the first chunk's filename and declared total size, preventing a transfer ID from changing metadata mid-upload. Symlinks are rejected; abandoned partial uploads older than 24 hours are cleaned up; staging is capped at 100 MiB and 16 concurrent sessions. Android verifies each download chunk's status, filename, offset and total, including zero-byte files.
+- **Audio controls and diagnostics:** Corrected the mute/unmute AppleScript syntax. macOS subprocess stderr now reaches the API error instead of being hidden. Audio-device listing tolerates a temporarily absent default device and client operations check response status.
+- **Restriction enforcement:** macOS fails closed if it cannot create the input-blocking event tap; the restrict endpoint returns HTTP 503 with a permissions explanation. Android displays the real input-blocking status and reconciles optimistic toggle state after rejected commands.
+- **Release safety:** The one-time v1.6.0 beta workflow fails if the published tag/release exists and disallows asset overwrites. No release or published asset was deleted or modified.
+- **Capture/listener reliability:** Screen capture retry attempts accumulate through repeated failures, use capped progressive backoff and reset after a 30-second healthy interval. The Mac control listener exposes health and the LaunchAgent retries startup/failed listener states.
+- **H.264 and live A/V:** H.264 access units are copied from possibly segmented CoreMedia buffers before parsing and capped at the Android 5 MiB limit. Audio/video packets share a local monotonic presentation-time mapping on Android; video renders are timestamp-scheduled and audio writes are paced by packet PTS. Audio packets no longer starve video packets on a constrained connection. Synchronization remains subject to physical-device output latency and jitter tests.
+- **Input/UI correctness:** Android control mode serializes mouse/typing requests, surfaces CoreGraphics creation failures, ignores duplicate switch taps while animations dispatch, uses the captured click state for mute/restriction commands, and removes touch-intercepting invisible viewer overlays. AudioTrack negative writes are reported and shut down cleanly; zero-byte writes are retried without dropping the chunk.
+- **Diagnostics/metadata:** macOS bundle version is aligned to 1.6.0; user-facing API errors include Core Audio/subprocess failure details.
+
+## Required final verification
+
+1. Confirm current-head Android and macOS CI passes after all follow-up commits.
+2. On an Android install that still has V2-encrypted credentials, verify pairing and every saved Mac profile survive upgrade and migrate without re-entry.
+3. On paired devices, test zero-byte and large file transfers, interrupted/retried uploads, duplicate filenames, storage exhaustion, and hostile offset values.
+4. Verify mute/unmute and input/output device switching on the actual macOS version and audio devices; capture the returned diagnostic if a permission prompt remains.
+5. Test restriction with Input Monitoring granted and denied, plus restart while restricted; verify the app never claims input is blocked when the event tap is absent.
+6. Test video/audio start-stop, reconnect, audio opt-in, packet timing, surface rotation/backgrounding, and sustained CPU/network/battery use. Verify the best-effort PTS schedule on multiple Android devices and measure any persistent lead/lag.
+7. Confirm listener recovery by making port 47777 unavailable at startup, then freeing it; verify the 20-second health timer rebinds the port without restarting the LaunchAgent.
+
+The current branch should not be described as fully runtime-verified until those device checks are complete. File any newly reproduced issue with logs and device/OS versions rather than marking it fixed based only on compilation.

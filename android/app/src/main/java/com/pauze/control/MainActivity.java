@@ -59,6 +59,7 @@ public final class MainActivity extends Activity {
     private SlideActionView restrictionControl;
     private SlideActionView muteButton;
     private boolean macRestricted;
+    private boolean macInputBlockingEnabled;
 
     private SeekBar volumeSeek;
 
@@ -191,9 +192,7 @@ public final class MainActivity extends Activity {
         );
         restrictionControl.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        macRestricted
-                                ? "/v1/allow"
-                                : "/v1/restrict"
+                        view.getLastActivatedChecked() ? "/v1/restrict" : "/v1/allow"
                 )
         );
 
@@ -234,9 +233,7 @@ public final class MainActivity extends Activity {
         );
         muteButton.setOnSlideCompleteListener(
                 view -> sendCommand(
-                        macMuted
-                                ? "/v1/unmute"
-                                : "/v1/mute"
+                        view.getLastActivatedChecked() ? "/v1/mute" : "/v1/unmute"
                 )
         );
 
@@ -615,15 +612,14 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        getSharedPreferences("pauze_connection", MODE_PRIVATE)
-                .edit()
-                .putString("host", host)
-                .apply();
-
         executor.execute(
                 () -> {
                     try {
                         secureStore.putToken(token);
+                        getSharedPreferences("pauze_connection", MODE_PRIVATE)
+                                .edit()
+                                .putString("host", host)
+                                .apply();
                         setStatus(
                                 "Connection saved • syncing Mac…"
                         );
@@ -717,10 +713,8 @@ public final class MainActivity extends Activity {
                 new JSONObject(result.body);
 
         updateState(
-                root.optBoolean(
-                        "restricted",
-                        false
-                )
+                root.optBoolean("restricted", false),
+                root.optBoolean("input_blocking_enabled", false)
         );
 
         updateSystem(
@@ -747,19 +741,21 @@ public final class MainActivity extends Activity {
     }
 
     private void updateState(
-            boolean restricted
+            boolean restricted,
+            boolean inputBlockingEnabled
     ) {
         mainHandler.post(
                 () -> {
-                    macRestricted = restricted;
-                    restrictionControl.setText(
-                            "MAC RESTRICTION"
-                    );
-                    restrictionControl.setChecked(
-                            restricted
-                    );
+                    macInputBlockingEnabled = inputBlockingEnabled;
+                    macRestricted = restricted && inputBlockingEnabled;
+                    restrictionControl.setText("MAC RESTRICTION");
+                    restrictionControl.setChecked(macRestricted);
 
-                    if (restricted) {
+                    if (restricted && !inputBlockingEnabled) {
+                        macStateText.setText("Restriction unavailable • input is not blocked");
+                        connectionPill.setText("● RESTRICTION FAILED");
+                        connectionPill.setTextColor(AMBER);
+                    } else if (macRestricted) {
                         macStateText.setText(
                                 "Restricted • awaiting ALLOW"
                         );
@@ -1009,6 +1005,9 @@ public final class MainActivity extends Activity {
                         showError(
                                 error.getMessage()
                         );
+                        // Reconcile optimistic switch visuals with the Mac's
+                        // actual state after a rejected or interrupted action.
+                        mainHandler.postDelayed(() -> refreshStatus(false), 250L);
                     }
                 }
         );
@@ -1052,9 +1051,12 @@ public final class MainActivity extends Activity {
 
                         if (result.code < 200 ||
                                 result.code >= 300) {
-                            throw new IllegalStateException(
-                                    "Volume command failed."
-                            );
+                            String message = "Volume command failed (HTTP " + result.code + ").";
+                            try {
+                                message = new JSONObject(result.body).optString("error", message);
+                            } catch (Exception ignored) {
+                            }
+                            throw new IllegalStateException(message);
                         }
 
                         setStatus(

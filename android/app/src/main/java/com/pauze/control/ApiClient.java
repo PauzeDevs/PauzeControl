@@ -42,11 +42,22 @@ public final class ApiClient {
     }
 
     public static HttpURLConnection openScreen(String host, String token) throws Exception {
-        URI uri = buildUri(host, "/v1/screen");
+        return openScreen(host, token, false);
+    }
+
+    public static HttpURLConnection openScreen(
+            String host,
+            String token,
+            boolean audioEnabled
+    ) throws Exception {
+        String path = audioEnabled ? "/v1/screen?audio=1" : "/v1/screen";
+        URI uri = buildUri(host, path);
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
-        configure(connection, token, "GET", "/v1/screen", "");
+        configure(connection, token, "GET", path, "");
         connection.setReadTimeout(0);
-        connection.setRequestProperty("Accept", "video/H264");
+        connection.setRequestProperty("Accept", audioEnabled
+                ? "video/H264, application/x-pauze-pcm"
+                : "video/H264");
         return connection;
     }
 
@@ -54,13 +65,13 @@ public final class ApiClient {
         HttpURLConnection connection = (HttpURLConnection) buildUri(host, path).toURL().openConnection();
         try {
             configure(connection, token, method, path, body);
-            connection.setReadTimeout(5000);
+            connection.setReadTimeout(15000);
 
             if ("POST".equals(method)) {
                 byte[] payload = body.getBytes(StandardCharsets.UTF_8);
                 connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(payload.length);
                 connection.setRequestProperty("Content-Type", "application/json");
-                connection.setRequestProperty("Content-Length", Integer.toString(payload.length));
                 try (OutputStream output = connection.getOutputStream()) {
                     output.write(payload);
                 }
@@ -105,7 +116,10 @@ public final class ApiClient {
         }
 
         int port = base.getPort() == -1 ? PAUZE_PORT : base.getPort();
-        return new URI(scheme, null, base.getHost(), port, path, null, null);
+        int queryIndex = path.indexOf('?');
+        String requestPath = queryIndex >= 0 ? path.substring(0, queryIndex) : path;
+        String query = queryIndex >= 0 ? path.substring(queryIndex + 1) : null;
+        return new URI(scheme, null, base.getHost(), port, requestPath, query, null);
     }
 
     private static void configure(HttpURLConnection connection, String token, String method, String path, String body) throws Exception {

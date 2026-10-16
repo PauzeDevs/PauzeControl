@@ -1,6 +1,7 @@
 // PauzeControl — Copyright (c) 2026 PauzeDevs. All rights reserved.
 
 import AppKit
+import AudioToolbox
 import CoreImage
 import CoreMedia
 import CoreVideo
@@ -14,6 +15,16 @@ struct EncodedScreenFrame {
     let height: Int
     let ptsMicroseconds: Int64
     let keyFrame: Bool
+}
+
+struct EncodedScreenAudio {
+    let data: Data
+    let ptsMicroseconds: Int64
+}
+
+private struct ScreenSubscriber {
+    let onFrame: (EncodedScreenFrame) -> Void
+    let onAudio: ((EncodedScreenAudio) -> Void)?
 }
 
 final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
@@ -37,6 +48,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     static let maxHeight = 1080
     static let maxFPS = 60
     static let targetAverageBitrate = 8_000_000
+    static let audioSampleRate = 24_000
 
     private let queue = DispatchQueue(label: "com.pauze.control.screen", qos: .userInitiated)
     private let ciContext = CIContext()
@@ -47,11 +59,16 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var encoderHeight = 0
     private var outputWidth = 0
     private var outputHeight = 0
-    private var subscribers: [UUID: (EncodedScreenFrame) -> Void] = [:]
+    private var subscribers: [UUID: ScreenSubscriber] = [:]
+
+    private var wantsAudioCapture: Bool {
+        subscribers.values.contains { $0.onAudio != nil }
+    }
     private var lastFrameTime: CFTimeInterval = 0
     private var starting = false
     private var forceNextKeyframe = true
     private var retryWorkItem: DispatchWorkItem?
+    private var stableCaptureResetWorkItem: DispatchWorkItem?
     private var captureAttempt = 0
     private var activeFPS = 30
     private var activeBitrate = 4_000_000
@@ -176,6 +193,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func restartCapture() {
         retryWorkItem?.cancel()
         retryWorkItem = nil
+        stableCaptureResetWorkItem?.cancel()
+        stableCaptureResetWorkItem = nil
         captureAttempt = 0
         starting = false
 
@@ -207,20 +226,40 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     @discardableResult
-    func subscribe(_ handler: @escaping (EncodedScreenFrame) -> Void) -> UUID {
+    func subscribe(
+        audioEnabled: Bool,
+        onFrame: @escaping (EncodedScreenFrame) -> Void,
+        onAudio: @escaping (EncodedScreenAudio) -> Void
+    ) -> UUID {
         let id = UUID()
         queue.async {
-            self.subscribers[id] = handler
+            let wasCapturingAudio = self.wantsAudioCapture
+            self.subscribers[id] = ScreenSubscriber(
+                onFrame: onFrame,
+                onAudio: audioEnabled ? onAudio : nil
+            )
             self.forceNextKeyframe = true
-            if self.subscribers.count == 1 { self.startCapture() }
+
+            if self.subscribers.count == 1 {
+                self.startCapture()
+            } else if wasCapturingAudio != self.wantsAudioCapture {
+                // Reconfigure ScreenCaptureKit only when the first audio
+                // subscriber arrives or the last one leaves.
+                self.restartCapture()
+            }
         }
         return id
     }
 
     func unsubscribe(_ id: UUID) {
         queue.async {
+            let wasCapturingAudio = self.wantsAudioCapture
             self.subscribers.removeValue(forKey: id)
-            if self.subscribers.isEmpty { self.stopCapture() }
+            if self.subscribers.isEmpty {
+                self.stopCapture()
+            } else if wasCapturingAudio != self.wantsAudioCapture {
+                self.restartCapture()
+            }
         }
     }
 
@@ -236,6 +275,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                         self.starting = true
                         self.loadShareableContent()
                     } else {
+                        self.captureAttempt += 1
                         self.starting = false
                         self.scheduleCaptureRetry()
                     }
@@ -244,7 +284,6 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             return
         }
         starting = true
-        captureAttempt = 0
         retryWorkItem?.cancel()
         retryWorkItem = nil
         loadShareableContent()
@@ -264,7 +303,6 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                 }
                 let mainID = CGMainDisplayID()
                 let display = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first!
-                self.captureAttempt = 0
                 self.startStream(for: display)
             }
         }
@@ -316,11 +354,19 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
         configuration.queueDepth = 2
         configuration.pixelFormat = kCVPixelFormatType_32BGRA
         configuration.showsCursor = true
-        configuration.capturesAudio = false
+        let captureSystemAudio = wantsAudioCapture
+        configuration.capturesAudio = captureSystemAudio
+        if captureSystemAudio {
+            configuration.sampleRate = Self.audioSampleRate
+            configuration.channelCount = 1
+        }
 
         do {
             let newStream = SCStream(filter: filter, configuration: configuration, delegate: self)
             try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+            if captureSystemAudio {
+                try newStream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
+            }
             stream = newStream
             newStream.startCapture { [weak self] error in
                 guard let self else { return }
@@ -330,11 +376,13 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
                         print("[PauzeControl] Screen capture failed: \(error)")
                         self.stream = nil
                         self.invalidateEncoder()
+                        self.captureAttempt += 1
                         self.starting = false
                         self.scheduleCaptureRetry()
                         return
                     }
                     self.starting = false
+                    self.scheduleStableCaptureReset(for: newStream)
                     print("[PauzeControl] Screen capture started: \(self.outputWidth)x\(self.outputHeight) @ \(self.activeFPS) FPS H.264 (\(self.activeProfileName)).")
                 }
             }
@@ -342,9 +390,24 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             print("[PauzeControl] Unable to attach screen output: \(error)")
             stream = nil
             invalidateEncoder()
+            captureAttempt += 1
             starting = false
             scheduleCaptureRetry()
         }
+    }
+
+    private func scheduleStableCaptureReset(for stream: SCStream) {
+        stableCaptureResetWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self, weak stream] in
+            guard let self, let stream else { return }
+            self.queue.async {
+                guard self.stream === stream else { return }
+                self.captureAttempt = 0
+                self.stableCaptureResetWorkItem = nil
+            }
+        }
+        stableCaptureResetWorkItem = work
+        queue.asyncAfter(deadline: .now() + 30, execute: work)
     }
 
     private func scheduleCaptureRetry() {
@@ -398,6 +461,8 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     private func stopCapture() {
         retryWorkItem?.cancel()
         retryWorkItem = nil
+        stableCaptureResetWorkItem?.cancel()
+        stableCaptureResetWorkItem = nil
         captureAttempt = 0
         starting = false
         if let stream {
@@ -468,6 +533,10 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        if type == .audio {
+            handleCapturedAudio(sampleBuffer)
+            return
+        }
         guard type == .screen, CMSampleBufferIsValid(sampleBuffer), let sourceBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let now = CACurrentMediaTime()
         if lastFrameTime != 0 && now - lastFrameTime < (1.0 / Double(activeFPS)) { return }
@@ -505,19 +574,183 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             guard self.stream === stream else { return }
             self.stream = nil
             self.invalidateEncoder()
+            self.captureAttempt += 1
             self.starting = false
             if !self.subscribers.isEmpty { self.scheduleCaptureRetry() }
         }
     }
 
+    private func timestampMicroseconds(from presentationTime: CMTime) -> Int64 {
+        let seconds = CMTimeGetSeconds(presentationTime)
+        let microseconds = seconds * 1_000_000
+        guard presentationTime.isValid,
+              seconds.isFinite,
+              seconds >= 0,
+              microseconds.isFinite,
+              microseconds < Double(Int64.max)
+        else {
+            return Int64((CACurrentMediaTime() * 1_000_000).rounded())
+        }
+        return Int64(microseconds.rounded())
+    }
+
+    private func handleCapturedAudio(_ sampleBuffer: CMSampleBuffer) {
+        guard CMSampleBufferIsValid(sampleBuffer),
+              wantsAudioCapture,
+              let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let basicDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
+              basicDescription.pointee.mFormatID == kAudioFormatLinearPCM,
+              basicDescription.pointee.mChannelsPerFrame == 1
+        else {
+            return
+        }
+
+        let audioFormat = basicDescription.pointee
+        let bitsPerSample = Int(audioFormat.mBitsPerChannel)
+        let bytesPerFrame = Int(audioFormat.mBytesPerFrame)
+        let sourceSampleRate = audioFormat.mSampleRate
+        guard bytesPerFrame > 0,
+              sourceSampleRate > 0,
+              bitsPerSample == 16 || bitsPerSample == 32
+        else {
+            return
+        }
+
+        var requiredBufferListSize = 0
+        var retainedBlockBuffer: CMBlockBuffer?
+        _ = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: &requiredBufferListSize,
+            bufferListOut: nil,
+            bufferListSize: 0,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
+            blockBufferOut: &retainedBlockBuffer
+        )
+        guard requiredBufferListSize >= MemoryLayout<AudioBufferList>.size else {
+            return
+        }
+
+        let storage = UnsafeMutableRawPointer.allocate(
+            byteCount: requiredBufferListSize,
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { storage.deallocate() }
+
+        let audioBufferList = storage.bindMemory(to: AudioBufferList.self, capacity: 1)
+        var filledBufferListSize = 0
+        let allocatedBufferListSize = requiredBufferListSize
+        let listStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: &filledBufferListSize,
+            bufferListOut: audioBufferList,
+            bufferListSize: allocatedBufferListSize,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
+            blockBufferOut: &retainedBlockBuffer
+        )
+        guard listStatus == noErr,
+              let audioBuffer = UnsafeMutableAudioBufferListPointer(audioBufferList).first,
+              let sourceData = audioBuffer.mData
+        else {
+            return
+        }
+
+        let sourceFrameCount = min(
+            CMSampleBufferGetNumSamples(sampleBuffer),
+            Int(audioBuffer.mDataByteSize) / bytesPerFrame
+        )
+        guard sourceFrameCount > 0 else { return }
+
+        let isFloat = (audioFormat.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+        let isSignedInteger = (audioFormat.mFormatFlags & kAudioFormatFlagIsSignedInteger) != 0
+        guard (isFloat && bitsPerSample == 32) ||
+              (isSignedInteger && (bitsPerSample == 16 || bitsPerSample == 32))
+        else {
+            return
+        }
+
+        // ScreenCaptureKit gives us mono linear PCM at the requested 24 kHz
+        // rate. Convert it to signed 16-bit little-endian PCM for low-overhead
+        // Android AudioTrack playback.
+        let outputFrameCount = Int(
+            (Double(sourceFrameCount) * Double(Self.audioSampleRate) / sourceSampleRate)
+                .rounded(.down)
+        )
+        guard outputFrameCount > 0 else { return }
+
+        var pcm = Data()
+        pcm.reserveCapacity(outputFrameCount * MemoryLayout<Int16>.size)
+        let rawSource = sourceData.assumingMemoryBound(to: UInt8.self)
+
+        for outputIndex in 0..<outputFrameCount {
+            let sourceIndex = min(
+                sourceFrameCount - 1,
+                Int(Double(outputIndex) * sourceSampleRate / Double(Self.audioSampleRate))
+            )
+            let byteOffset = sourceIndex * bytesPerFrame
+            let value: Double
+
+            if isFloat {
+                value = Double(
+                    rawSource.advanced(by: byteOffset)
+                        .withMemoryRebound(to: Float.self, capacity: 1) { $0.pointee }
+                )
+            } else if bitsPerSample == 16 {
+                value = Double(
+                    rawSource.advanced(by: byteOffset)
+                        .withMemoryRebound(to: Int16.self, capacity: 1) { $0.pointee }
+                ) / 32768.0
+            } else {
+                value = Double(
+                    rawSource.advanced(by: byteOffset)
+                        .withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
+                ) / 2_147_483_648.0
+            }
+
+            let finiteValue = value.isFinite ? value : 0.0
+            let clipped = max(-1.0, min(1.0, finiteValue))
+            let sample: Int16 = clipped <= -1.0
+                ? Int16.min
+                : Int16((clipped * 32767.0).rounded())
+            let bits = UInt16(bitPattern: sample)
+            pcm.append(UInt8(bits & 0xFF))
+            pcm.append(UInt8((bits >> 8) & 0xFF))
+        }
+
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let pts = timestampMicroseconds(from: presentationTime)
+        let packet = EncodedScreenAudio(data: pcm, ptsMicroseconds: max(0, pts))
+
+        for subscriber in subscribers.values {
+            subscriber.onAudio?(packet)
+        }
+    }
+
     fileprivate func handleEncoded(_ sampleBuffer: CMSampleBuffer) {
-        guard CMSampleBufferIsValid(sampleBuffer), let format = CMSampleBufferGetFormatDescription(sampleBuffer), let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
+        guard CMSampleBufferIsValid(sampleBuffer),
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)
+        else { return }
         let headerLength = h264NALHeaderLength(formatDescription: format)
-        var totalLength = 0
-        var lengthAtOffset = 0
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        guard CMBlockBufferGetDataPointer(dataBuffer, atOffset: 0, lengthAtOffsetOut: &lengthAtOffset, totalLengthOut: &totalLength, dataPointerOut: &dataPointer) == kCMBlockBufferNoErr, totalLength > 0, let dataPointer else { return }
-        let bytes = UnsafeMutableRawPointer(dataPointer).assumingMemoryBound(to: UInt8.self)
+        let totalLength = CMBlockBufferGetDataLength(dataBuffer)
+        // Android rejects access units above this limit; enforce the same cap
+        // here and copy segmented CoreMedia blocks before indexing their bytes.
+        guard totalLength > 0, totalLength <= 5 * 1024 * 1024 else { return }
+        var encodedData = Data(count: totalLength)
+        let copyStatus = encodedData.withUnsafeMutableBytes { destination -> OSStatus in
+            guard let base = destination.baseAddress else { return -1 }
+            return CMBlockBufferCopyDataBytes(
+                dataBuffer,
+                atOffset: 0,
+                dataLength: totalLength,
+                destination: base.assumingMemoryBound(to: Int8.self)
+            )
+        }
+        guard copyStatus == kCMBlockBufferNoErr else { return }
+        let bytes = [UInt8](encodedData)
         var accessUnit = Data()
         var offset = 0
         var containsIDR = false
@@ -528,7 +761,7 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             guard nalLength > 0, offset + nalLength <= totalLength else { return }
             if Int(bytes[offset] & 0x1F) == 5 { containsIDR = true }
             appendStartCode(to: &accessUnit)
-            accessUnit.append(Data(bytes: bytes.advanced(by: offset), count: nalLength))
+            accessUnit.append(contentsOf: bytes[offset..<(offset + nalLength)])
             offset += nalLength
         }
         guard !accessUnit.isEmpty else { return }
@@ -543,12 +776,12 @@ final class ScreenStreamer: NSObject, SCStreamOutput, SCStreamDelegate {
             prefixed.append(accessUnit)
             accessUnit = prefixed
         }
-        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        let ptsMicroseconds = pts.isValid ? Int64((CMTimeGetSeconds(pts) * 1_000_000).rounded()) : Int64((CACurrentMediaTime() * 1_000_000).rounded())
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let ptsMicroseconds = timestampMicroseconds(from: presentationTime)
         let frame = EncodedScreenFrame(data: accessUnit, width: encoderWidth, height: encoderHeight, ptsMicroseconds: max(0, ptsMicroseconds), keyFrame: containsIDR)
         queue.async {
             guard !self.subscribers.isEmpty else { return }
-            for subscriber in self.subscribers.values { subscriber(frame) }
+            for subscriber in self.subscribers.values { subscriber.onFrame(frame) }
         }
     }
 }

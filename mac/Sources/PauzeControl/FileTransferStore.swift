@@ -8,6 +8,10 @@ struct TransferFileInfo: Codable {
 }
 struct FilesListResponse: Codable { let ok: Bool; let files: [TransferFileInfo] }
 struct UploadChunkResponse: Codable { let ok: Bool; let complete: Bool }
+private struct UploadSessionMetadata: Codable {
+    let filename: String
+    let total: Int64
+}
 struct DownloadChunkResponse: Codable {
     let ok: Bool
     let filename: String
@@ -19,6 +23,9 @@ struct DownloadChunkResponse: Codable {
 enum FileTransferStore {
     static let maximumFileBytes: Int64 = 50 * 1024 * 1024
     static let maximumChunkBytes = 24 * 1024
+    private static let maximumStagedBytes: Int64 = 100 * 1024 * 1024
+    private static let maximumConcurrentStagedUploads = 16
+    private static let maximumStagingAge: TimeInterval = 24 * 60 * 60
     private static let lock = NSLock()
     private static let fm = FileManager.default
 
@@ -32,6 +39,48 @@ enum FileTransferStore {
     private static func prepare() throws {
         try fm.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try fm.createDirectory(at: stagingURL, withIntermediateDirectories: true)
+    }
+
+    /// Discard abandoned partial uploads and bound disk use by unfinished transfers.
+    private static func cleanupStaging() throws -> (bytes: Int64, count: Int) {
+        let urls = try fm.contentsOfDirectory(
+            at: stagingURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )
+        let cutoff = Date().addingTimeInterval(-maximumStagingAge)
+        var remainingBytes: Int64 = 0
+        var remainingCount = 0
+        var activePartialPaths = Set<String>()
+
+        for url in urls {
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
+            if values?.isSymbolicLink == true {
+                try? fm.removeItem(at: url)
+                continue
+            }
+            guard values?.isRegularFile == true, url.pathExtension == "part" else {
+                continue
+            }
+            if let modified = values?.contentModificationDate, modified < cutoff {
+                try? fm.removeItem(at: url)
+                try? fm.removeItem(at: url.deletingPathExtension().appendingPathExtension("meta"))
+                continue
+            }
+            activePartialPaths.insert(url.path)
+            remainingBytes += Int64(max(0, values?.fileSize ?? 0))
+            remainingCount += 1
+        }
+
+        // A crash between finalizing a partial and removing its sidecar must
+        // not accumulate orphan metadata files forever.
+        for url in urls where url.pathExtension == "meta" {
+            let partial = url.deletingPathExtension().appendingPathExtension("part")
+            if !activePartialPaths.contains(partial.path) {
+                try? fm.removeItem(at: url)
+            }
+        }
+        return (remainingBytes, remainingCount)
     }
 
     private static func safeFilename(_ name: String) throws -> String {
@@ -60,8 +109,8 @@ enum FileTransferStore {
             options: [.skipsHiddenFiles])
         return urls.compactMap { url in
             guard url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL,
-                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
-                  values.isRegularFile == true, let size = values.fileSize,
+                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]),
+                  values.isSymbolicLink != true, values.isRegularFile == true, let size = values.fileSize,
                   Int64(size) <= maximumFileBytes else { return nil }
             return TransferFileInfo(name: url.lastPathComponent, size: Int64(size),
                 modifiedAt: values.contentModificationDate?.timeIntervalSince1970 ?? 0)
@@ -72,9 +121,9 @@ enum FileTransferStore {
                             offset: Int64, total: Int64, base64Data: String) throws -> Bool {
         let transferID = try safeTransferID(rawID)
         let filename = try safeFilename(rawName)
-        guard offset >= 0, total >= 0, total <= maximumFileBytes,
+        guard offset >= 0, total >= 0, total <= maximumFileBytes, offset <= total,
               let chunk = Data(base64Encoded: base64Data), chunk.count <= maximumChunkBytes,
-              offset + Int64(chunk.count) <= total else {
+              Int64(chunk.count) <= total - offset else {
             throw NSError(domain: "PauzeControl.Files", code: 400,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid upload size, offset or chunk. Files are limited to 50 MiB."])
         }
@@ -82,8 +131,29 @@ enum FileTransferStore {
         defer { lock.unlock() }
         try prepare()
         let partial = stagingURL.appendingPathComponent(transferID + ".part")
+        let metadataURL = stagingURL.appendingPathComponent(transferID + ".meta")
         let destination = rootURL.appendingPathComponent(filename)
+        if (try? partial.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true ||
+           (try? metadataURL.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+            throw NSError(domain: "PauzeControl.Files", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "Upload staging path must not be a symbolic link."])
+        }
+        // Recalculate staging use for every chunk, not just the first one:
+        // otherwise several started uploads could collectively exceed the cap.
+        let staging = try cleanupStaging()
+        guard Int64(chunk.count) <= maximumStagedBytes - min(staging.bytes, maximumStagedBytes) else {
+            throw NSError(domain: "PauzeControl.Files", code: 413,
+                          userInfo: [NSLocalizedDescriptionKey: "Temporary upload storage is full. Finish or retry later after abandoned uploads are cleaned up."])
+        }
         if offset == 0 {
+            guard staging.count < maximumConcurrentStagedUploads else {
+                throw NSError(domain: "PauzeControl.Files", code: 429,
+                              userInfo: [NSLocalizedDescriptionKey: "Too many upload sessions are in progress. Finish or retry later."])
+            }
+            guard total <= maximumStagedBytes - min(staging.bytes, maximumStagedBytes) else {
+                throw NSError(domain: "PauzeControl.Files", code: 413,
+                              userInfo: [NSLocalizedDescriptionKey: "Temporary upload storage is full. Finish or retry later after abandoned uploads are cleaned up."])
+            }
             guard !fm.fileExists(atPath: partial.path) else {
                 throw NSError(domain: "PauzeControl.Files", code: 409,
                               userInfo: [NSLocalizedDescriptionKey: "An upload with this transfer ID is already in progress."])
@@ -96,9 +166,24 @@ enum FileTransferStore {
                 throw NSError(domain: "PauzeControl.Files", code: 500,
                               userInfo: [NSLocalizedDescriptionKey: "Could not create the temporary upload file."])
             }
-        } else if !fm.fileExists(atPath: partial.path) {
-            throw NSError(domain: "PauzeControl.Files", code: 400,
-                          userInfo: [NSLocalizedDescriptionKey: "Upload session expired or first chunk is missing."])
+            do {
+                let metadata = UploadSessionMetadata(filename: filename, total: total)
+                let metadataData = try JSONEncoder().encode(metadata)
+                try metadataData.write(to: metadataURL, options: [.atomic])
+            } catch {
+                try? fm.removeItem(at: partial)
+                try? fm.removeItem(at: metadataURL)
+                throw error
+            }
+        } else {
+            guard let partialValues = try? partial.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  partialValues.isRegularFile == true, partialValues.isSymbolicLink != true,
+                  let metadataData = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONDecoder().decode(UploadSessionMetadata.self, from: metadataData),
+                  metadata.filename == filename, metadata.total == total else {
+                throw NSError(domain: "PauzeControl.Files", code: 400,
+                              userInfo: [NSLocalizedDescriptionKey: "Upload session metadata does not match this filename or declared size."])
+            }
         }
         let attrs = try fm.attributesOfItem(atPath: partial.path)
         let currentSize = (attrs[.size] as? NSNumber)?.int64Value ?? -1
@@ -124,10 +209,12 @@ enum FileTransferStore {
         if newSize == total {
             guard !fm.fileExists(atPath: destination.path) else {
                 try? fm.removeItem(at: partial)
+                try? fm.removeItem(at: metadataURL)
                 throw NSError(domain: "PauzeControl.Files", code: 409,
                               userInfo: [NSLocalizedDescriptionKey: "A file with this name already exists."])
             }
             try fm.moveItem(at: partial, to: destination)
+            try? fm.removeItem(at: metadataURL)
             return true
         }
         return false
@@ -142,8 +229,8 @@ enum FileTransferStore {
         try prepare()
         let url = rootURL.appendingPathComponent(filename)
         guard url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL,
-              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-              values.isRegularFile == true, let size = values.fileSize,
+              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+              values.isSymbolicLink != true, values.isRegularFile == true, let size = values.fileSize,
               Int64(size) <= maximumFileBytes, offset <= Int64(size) else {
             throw NSError(domain: "PauzeControl.Files", code: 404,
                           userInfo: [NSLocalizedDescriptionKey: "Transferred file was not found or exceeds the download limit."])

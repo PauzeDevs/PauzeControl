@@ -20,8 +20,11 @@ struct AudioDeviceChangeResponse: Codable {
 enum AudioDeviceService {
     static func list() throws -> [AudioDeviceInfo] {
         let ids = try deviceIDs()
-        let defaultInput = try defaultDevice(selector: kAudioHardwarePropertyDefaultInputDevice)
-        let defaultOutput = try defaultDevice(selector: kAudioHardwarePropertyDefaultOutputDevice)
+        // Some macOS configurations temporarily expose no default device
+        // (for example, while an audio interface is disconnecting). Device
+        // enumeration should still succeed so the user can choose another one.
+        let defaultInput = try? defaultDevice(selector: kAudioHardwarePropertyDefaultInputDevice)
+        let defaultOutput = try? defaultDevice(selector: kAudioHardwarePropertyDefaultOutputDevice)
         var devices: [AudioDeviceInfo] = []
         for id in ids {
             let input = channelCount(id, scope: kAudioDevicePropertyScopeInput) > 0
@@ -29,7 +32,8 @@ enum AudioDeviceService {
             guard input || output else { continue }
             devices.append(AudioDeviceInfo(id: id, name: deviceName(id) ?? "Audio device \(id)",
                 supportsInput: input, supportsOutput: output,
-                isDefaultInput: id == defaultInput, isDefaultOutput: id == defaultOutput))
+                isDefaultInput: defaultInput.map { $0 == id } ?? false,
+                isDefaultOutput: defaultOutput.map { $0 == id } ?? false))
         }
         return devices.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }

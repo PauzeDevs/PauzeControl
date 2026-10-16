@@ -17,6 +17,23 @@ jobs:
       - name: Check out tagged source
         uses: actions/checkout@v4
 
+      # This one-time beta tag is already published. Fail closed instead of
+      # silently replacing the APK attached to the existing release.
+      - name: Refuse to overwrite an existing beta release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v1.6.0-beta.1"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists; create a new release workflow for a new version."
+            exit 1
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists; refusing to overwrite published assets."
+            exit 1
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -69,7 +86,7 @@ jobs:
           prerelease: true
           draft: false
           make_latest: false
-          overwrite_files: true
+          overwrite_files: false
           fail_on_unmatched_files: true
           generate_release_notes: false
           files: |

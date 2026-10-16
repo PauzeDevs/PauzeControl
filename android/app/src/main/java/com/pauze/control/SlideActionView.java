@@ -39,6 +39,8 @@ public final class SlideActionView extends FrameLayout {
     private boolean toggleControl;
     private boolean persistentControl;
     private boolean checked;
+    private boolean lastActivatedChecked;
+    private boolean pressAnimating;
     private String currentText = "";
 
     public SlideActionView(Context context) {
@@ -135,15 +137,24 @@ public final class SlideActionView extends FrameLayout {
         return checked;
     }
 
+    /** Returns the state captured by the most recent accepted click. */
+    public boolean getLastActivatedChecked() {
+        return lastActivatedChecked;
+    }
+
     public void setOnSlideCompleteListener(
             OnSlideCompleteListener listener
     ) {
         this.listener = listener;
 
         setOnClickListener(view -> {
+            // Ignore repeated taps until the current press has dispatched. This
+            // keeps one switch transition tied to exactly one remote command.
+            if (pressAnimating) return;
             if (!toggleControl) {
                 animatePress(
                         () -> {
+                            lastActivatedChecked = checked;
                             if (this.listener != null) {
                                 this.listener.onSlideComplete(this);
                             }
@@ -154,10 +165,12 @@ public final class SlideActionView extends FrameLayout {
 
             if (persistentControl) {
                 checked = !checked;
+                final boolean requestedChecked = checked;
                 updateSwitchVisuals();
 
                 animatePress(
                         () -> {
+                            lastActivatedChecked = requestedChecked;
                             if (this.listener != null) {
                                 this.listener.onSlideComplete(this);
                             }
@@ -167,10 +180,12 @@ public final class SlideActionView extends FrameLayout {
             }
 
             checked = true;
+            final boolean requestedChecked = checked;
             updateSwitchVisuals();
 
             animatePress(
                     () -> {
+                        lastActivatedChecked = requestedChecked;
                         if (this.listener != null) {
                             this.listener.onSlideComplete(this);
                         }
@@ -259,6 +274,7 @@ public final class SlideActionView extends FrameLayout {
     }
 
     private void animatePress(Runnable endAction) {
+        pressAnimating = true;
         animate()
                 .scaleX(0.985f)
                 .scaleY(0.985f)
@@ -270,7 +286,10 @@ public final class SlideActionView extends FrameLayout {
                                 .scaleY(1f)
                                 .alpha(1f)
                                 .setDuration(160)
-                                .withEndAction(endAction)
+                                .withEndAction(() -> {
+                                    pressAnimating = false;
+                                    endAction.run();
+                                })
                                 .start()
                 )
                 .start();

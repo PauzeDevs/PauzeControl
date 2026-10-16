@@ -18,6 +18,8 @@ public final class ScreenStreamClient {
                 long ptsMicroseconds
         );
 
+        void onAudio(byte[] pcmS16LittleEndian, long ptsMicroseconds);
+
         void onConnected();
         void onError(String message);
         void onClosed();
@@ -29,6 +31,7 @@ public final class ScreenStreamClient {
     private final String host;
     private final String token;
     private final Listener listener;
+    private final boolean audioEnabled;
 
     private volatile boolean running;
     private volatile HttpURLConnection connection;
@@ -38,9 +41,19 @@ public final class ScreenStreamClient {
             String token,
             Listener listener
     ) {
+        this(host, token, listener, false);
+    }
+
+    public ScreenStreamClient(
+            String host,
+            String token,
+            Listener listener,
+            boolean audioEnabled
+    ) {
         this.host = host;
         this.token = token;
         this.listener = listener;
+        this.audioEnabled = audioEnabled;
     }
 
     public void start() {
@@ -65,7 +78,7 @@ public final class ScreenStreamClient {
     private void run() {
         HttpURLConnection activeConnection = null;
         try {
-            activeConnection = ApiClient.openScreen(host, token);
+            activeConnection = ApiClient.openScreen(host, token, audioEnabled);
             connection = activeConnection;
 
             // stop() may run while the socket is being created; never let
@@ -147,17 +160,35 @@ public final class ScreenStreamClient {
                     stream.readUnsignedShort();
 
             if (version != 1 ||
-                    headerLength != HEADER_SIZE) {
+                    headerLength != HEADER_SIZE ||
+                    (flags & ~0x03) != 0 ||
+                    flags == 0x03) {
                 throw new IllegalStateException(
-                        "Unsupported H.264 packet version."
+                        "Unsupported PZV1 stream packet."
                 );
             }
 
             if (payloadLength <= 0 ||
                     payloadLength > MAX_ACCESS_UNIT_BYTES) {
                 throw new IllegalStateException(
-                        "H.264 access unit is too large."
+                        "Stream packet payload is too large."
                 );
+            }
+
+            byte[] payload = new byte[payloadLength];
+            readFully(stream, payload, 0, payload.length);
+
+            boolean audioPacket = (flags & 0x02) != 0;
+            if (audioPacket) {
+                if (width != 0 || height != 0 || (payloadLength & 1) != 0) {
+                    throw new IllegalStateException(
+                            "Invalid PCM audio packet."
+                    );
+                }
+                if (audioEnabled) {
+                    listener.onAudio(payload, Math.max(0L, ptsMicroseconds));
+                }
+                continue;
             }
 
             if (width <= 0 ||
@@ -169,18 +200,8 @@ public final class ScreenStreamClient {
                 );
             }
 
-            byte[] accessUnit =
-                    new byte[payloadLength];
-
-            readFully(
-                    stream,
-                    accessUnit,
-                    0,
-                    accessUnit.length
-            );
-
             listener.onFrame(
-                    accessUnit,
+                    payload,
                     width,
                     height,
                     (flags & 0x01) != 0,
