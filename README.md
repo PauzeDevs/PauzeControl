@@ -57,7 +57,7 @@ Use it to check your Mac's status, control common system actions, view or intera
 - Quality targets from 144p through 1080p, with 60 FPS options at 720p and 1080p.
 - Pinch-to-zoom, panning, zoom buttons, and reset.
 
-> **Live audio availability:** this feature is being developed on `feat/live-screen-system-audio`. Build both the Mac agent and Android app from that same branch. Previously published v1.5.0 Stable and v1.6.0 Beta 1 APKs do not contain this audio feature yet. Follow [the audio build and test guide](docs/LIVE_SCREEN_AUDIO.md).
+> **Live audio availability:** the opt-in system-audio implementation is now part of the current source on `main` (merged in PR #12). The published v1.5.0 Stable and v1.6.0 Beta 1 APKs predate that implementation and do not contain it. To test it, build the Android app and Mac agent from the same `main` commit. Follow [the audio build and test guide](docs/LIVE_SCREEN_AUDIO.md).
 
 Actual frame rate and image quality depend on the Mac, display size, temperature, and network conditions.
 
@@ -158,7 +158,7 @@ There are two options.
 
 ### Option A — Download a published APK
 
-Use the [latest published release](https://github.com/PauzeDevs/PauzeControl/releases). The stable build remains v1.5.0, while [v1.6.0 Beta 1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) contains the Device Studio additions. Neither published APK includes live system-audio streaming yet. To test that feature, build both apps from the same development branch as described in [the audio test guide](docs/LIVE_SCREEN_AUDIO.md).
+Use the [latest published release](https://github.com/PauzeDevs/PauzeControl/releases). The stable build remains v1.5.0, while [v1.6.0 Beta 1](https://github.com/PauzeDevs/PauzeControl/releases/tag/v1.6.0-beta.1) contains the Device Studio additions. Neither published APK includes live system-audio streaming yet. To test the source implementation now on `main`, build both apps from the same `main` commit as described in [the audio test guide](docs/LIVE_SCREEN_AUDIO.md).
 
 After downloading an APK to your phone, open it and follow Android's prompt to allow installation from that source. Only install APKs from a source you trust.
 

@@ -5,11 +5,15 @@
 **Scope:** Android Java/XML application, H.264 viewer/client, macOS Swift agent, HTTP/HMAC layer, audio and file transfer, profile/key storage, installer, and GitHub Actions workflows.  
 **Method:** Static source review and GitHub Actions build/type-checks. No live adversarial network test or paired-device test is claimed.
 
+## Current status — 2026-10-21
+
+The live system-audio implementation and the follow-up remediation described below are now included in `main` via PR #12. This is a source-code merge, **not** a new stable APK release. The published v1.5.0 Stable and v1.6.0 Beta 1 APKs remain unchanged and do not contain the live-audio feature. Android/macOS compilation is not a substitute for paired-device testing; the device-level verification checklist below remains outstanding.
+
 ## Outcome and scope limits
 
 The October 12 counts below describe the previous audit snapshot only. Follow-up review on October 16 found additional defects; current changes and remaining device-only verification are recorded in the addendum at the end of this report. Passing CI demonstrates compilation, not operational correctness.
 
-All changes are being made on `feat/live-screen-system-audio` / draft PR #12. They have not been merged into `main`, and no GitHub Release or published release asset was edited.
+**Historical status (2026-10-16):** The remediation described in this report was being prepared on `feat/live-screen-system-audio` / draft PR #12. Since this snapshot, PR #12 was merged into `main` as commit [`bd9fcd3`](https://github.com/PauzeDevs/PauzeControl/commit/bd9fcd3a1312777e467ee6a1f29f61af39dfeadf). The merge did not edit any published GitHub Release or release asset.
 
 | Check | Result at the time of this report |
 |---|---|
@@ -113,4 +117,4 @@ The following changes were committed to the existing draft branch during the fol
 6. Test video/audio start-stop, reconnect, audio opt-in, packet timing, surface rotation/backgrounding, and sustained CPU/network/battery use. Verify the best-effort PTS schedule on multiple Android devices and measure any persistent lead/lag.
 7. Confirm listener recovery by making port 47777 unavailable at startup, then freeing it; verify the 20-second health timer rebinds the port without restarting the LaunchAgent.
 
-The current branch should not be described as fully runtime-verified until those device checks are complete. File any newly reproduced issue with logs and device/OS versions rather than marking it fixed based only on compilation.
+The merged `main` source should not be described as fully runtime-verified until those device checks are complete. File any newly reproduced issue with logs and device/OS versions rather than marking it fixed based only on compilation.
