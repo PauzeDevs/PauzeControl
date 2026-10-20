@@ -13,13 +13,18 @@ let package = Package(
         )
     ],
     targets: [
+        .target(
+            name: "PauzeControlHTTP",
+            path: "Sources/PauzeControlHTTP"
+        ),
         .executableTarget(
             name: "PauzeControl",
+            dependencies: ["PauzeControlHTTP"],
             path: "Sources/PauzeControl"
         ),
         .testTarget(
             name: "PauzeControlTests",
-            dependencies: ["PauzeControl"],
+            dependencies: ["PauzeControlHTTP"],
             path: "Tests/PauzeControlTests"
         )
     ]
