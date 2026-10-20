@@ -16,6 +16,11 @@ let package = Package(
         .executableTarget(
             name: "PauzeControl",
             path: "Sources/PauzeControl"
+        ),
+        .testTarget(
+            name: "PauzeControlTests",
+            dependencies: ["PauzeControl"],
+            path: "Tests/PauzeControlTests"
         )
     ]
 )
