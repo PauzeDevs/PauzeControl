@@ -1,6 +1,6 @@
 # PauzeControl Live Screen System Audio
 
-This document covers the opt-in system-output audio feature on the live-audio development branch. It is not included in previously published v1.5.0 Stable or v1.6.0 Beta 1 APKs.
+This document covers the opt-in system-output audio feature merged into the current `main` source through PR #12. It is not included in the previously published v1.5.0 Stable or v1.6.0 Beta 1 APKs; those release assets remain unchanged.
 
 ## Design
 
@@ -15,7 +15,7 @@ This document covers the opt-in system-output audio feature on the live-audio de
 
 ## Build both ends
 
-Use this same source branch for both platforms; a mismatched Mac agent and Android app will not negotiate the same audio packet protocol.
+Build both platforms from the same `main` commit; a mismatched Mac agent and Android app will not negotiate the same audio packet protocol.
 
 ### macOS
 
