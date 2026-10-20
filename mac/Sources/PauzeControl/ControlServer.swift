@@ -1043,7 +1043,7 @@ private func appendUInt64(
     }
 }
 
-private struct HTTPRequest {
+struct HTTPRequest {
     let method: String
     let path: String
     let headers: [String: String]
