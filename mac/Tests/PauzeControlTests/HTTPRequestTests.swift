@@ -2,7 +2,7 @@
 
 import Foundation
 import XCTest
-@testable import PauzeControl
+@testable import PauzeControlHTTP
 
 final class HTTPRequestTests: XCTestCase {
     private func parse(_ request: String) -> HTTPRequest? {
